@@ -24,6 +24,8 @@ export interface Loan {
   due_date: string
   principal: number
   interest: number
+  interest_rate: number
+  loan_type: string
   total?: number
   status: 'pending' | 'paid' | 'overdue'
   description: string
