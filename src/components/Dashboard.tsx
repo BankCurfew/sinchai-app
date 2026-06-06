@@ -10,12 +10,14 @@ import BroughtForwardBar from './shared/BroughtForwardBar'
 import TimeRangeSelector from './TimeRangeSelector'
 import type { TimeRange } from './TimeRangeSelector'
 import StatusBadge from './shared/StatusBadge'
+import { useCompany } from '../lib/company'
 
 interface OpeningBalances { cash_flow: number; loans: number; receivables: number; inventory: number }
 
 const COLORS = ['#fb7185', '#fbbf24', '#38bdf8', '#a78bfa', '#64748b']
 
 export default function Dashboard({ exportTrigger }: { exportTrigger: number }) {
+  const { selectedId, selectedName } = useCompany()
   const [cashFlow, setCashFlow] = useState<CashFlow[]>([])
   const [loans, setLoans] = useState<Loan[]>([])
   const [receivables, setReceivables] = useState<Receivable[]>([])
@@ -25,13 +27,12 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
   const [timeRange, setTimeRange] = useState<TimeRange>({ label: '6 เดือน', months: 6 })
 
   useEffect(() => {
-    Promise.all([
-      supabase.from('sinchai_cash_flow').select('*').order('date'),
-      supabase.from('sinchai_loans').select('*').order('due_date'),
-      supabase.from('sinchai_receivables').select('*').order('due_date'),
-      supabase.from('sinchai_inventory').select('*').order('date'),
-      supabase.from('sinchai_opening_balances').select('*'),
-    ]).then(([cf, ln, rc, inv, obd]) => {
+    let qCf = supabase.from('sinchai_cash_flow').select('*').order('date')
+    let qLn = supabase.from('sinchai_loans').select('*').order('due_date')
+    let qRc = supabase.from('sinchai_receivables').select('*').order('due_date')
+    let qInv = supabase.from('sinchai_inventory').select('*').order('date')
+    if (selectedId) { qCf = qCf.eq('company_id', selectedId); qLn = qLn.eq('company_id', selectedId); qRc = qRc.eq('company_id', selectedId); qInv = qInv.eq('company_id', selectedId) }
+    Promise.all([qCf, qLn, qRc, qInv, supabase.from('sinchai_opening_balances').select('*')]).then(([cf, ln, rc, inv, obd]) => {
       setCashFlow(cf.data || [])
       setLoans(ln.data || [])
       setReceivables(rc.data || [])
@@ -41,7 +42,7 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
       setOb(b)
       setLoading(false)
     })
-  }, [])
+  }, [selectedId])
 
   const monthList = useMemo(() => {
     const now = new Date()
@@ -142,7 +143,7 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
       {/* Header */}
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">แดชบอร์ดวางแผนการเงิน</h1>
+          <h1 className="text-2xl font-bold text-white">แดชบอร์ดวางแผนการเงิน — {selectedName}</h1>
           <p className="text-xs text-slate-400 mt-1">ภาพรวมและประมาณการทุกหมวด — อัปเดตล่าสุด {format(now, 'd MMM yyyy', { locale: th })}</p>
         </div>
         <TimeRangeSelector onChange={setTimeRange} />

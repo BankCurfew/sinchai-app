@@ -9,10 +9,12 @@ import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
 import TypeSelector, { inventoryOptions } from './shared/TypeSelector'
+import { useCompany } from '../lib/company'
 
 const emptyForm: InventoryEntry = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', item: '', quantity: 0, unit_price: 0 }
 
 export default function InventoryPage() {
+  const { selectedId } = useCompany()
   const [entries, setEntries] = useState<InventoryEntry[]>([])
   const [form, setForm] = useState<InventoryEntry>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
@@ -25,8 +27,10 @@ export default function InventoryPage() {
   const [showAddItem, setShowAddItem] = useState(false)
 
   const fetchAll = async () => {
+    let q = supabase.from('sinchai_inventory').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(200)
+    if (selectedId) q = q.eq('company_id', selectedId)
     const [{ data }, { data: ob }, { data: items }] = await Promise.all([
-      supabase.from('sinchai_inventory').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(200),
+      q,
       supabase.from('sinchai_opening_balances').select('*').eq('module', 'inventory').single(),
       supabase.from('sinchai_items').select('*').order('name'),
     ])
@@ -35,11 +39,11 @@ export default function InventoryPage() {
     setItemNames((items || []).map(i => i.name))
     setLoading(false)
   }
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { fetchAll() }, [selectedId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { date: form.date, type: form.type, item: form.item, quantity: form.quantity, unit_price: form.unit_price }
+    const payload = { date: form.date, type: form.type, item: form.item, quantity: form.quantity, unit_price: form.unit_price, company_id: selectedId }
     if (editId) { await supabase.from('sinchai_inventory').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_inventory').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); fetchAll()

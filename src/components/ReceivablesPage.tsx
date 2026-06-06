@@ -8,6 +8,7 @@ import BroughtForwardBar from './shared/BroughtForwardBar'
 import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
+import { useCompany } from '../lib/company'
 
 const emptyForm: Receivable = { debtor_name: '', amount: 0, due_date: format(new Date(), 'yyyy-MM-dd'), status: 'pending', expected_date: null, notes: '' }
 const statusMap: Record<string, { label: string; variant: 'success' | 'danger' | 'warning' | 'info' }> = {
@@ -15,6 +16,7 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'danger' |
 }
 
 export default function ReceivablesPage() {
+  const { selectedId } = useCompany()
   const [entries, setEntries] = useState<Receivable[]>([])
   const [form, setForm] = useState<Receivable>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
@@ -24,19 +26,21 @@ export default function ReceivablesPage() {
   const [obDate, setObDate] = useState('')
 
   const fetchAll = async () => {
+    let q = supabase.from('sinchai_receivables').select('*').order('due_date').limit(100)
+    if (selectedId) q = q.eq('company_id', selectedId)
     const [{ data }, { data: ob }] = await Promise.all([
-      supabase.from('sinchai_receivables').select('*').order('due_date').limit(100),
+      q,
       supabase.from('sinchai_opening_balances').select('*').eq('module', 'receivables').single(),
     ])
     setEntries(data || [])
     if (ob) { setOpeningBalance(Number(ob.amount)); setObDate(ob.as_of_date) }
     setLoading(false)
   }
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { fetchAll() }, [selectedId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { debtor_name: form.debtor_name, amount: form.amount, due_date: form.due_date, status: form.status, expected_date: form.expected_date || null, notes: form.notes }
+    const payload = { debtor_name: form.debtor_name, amount: form.amount, due_date: form.due_date, status: form.status, expected_date: form.expected_date || null, notes: form.notes, company_id: selectedId }
     if (editId) { await supabase.from('sinchai_receivables').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_receivables').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); fetchAll()

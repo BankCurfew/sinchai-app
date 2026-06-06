@@ -9,10 +9,12 @@ import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
 import TypeSelector, { cashFlowOptions } from './shared/TypeSelector'
+import { useCompany } from '../lib/company'
 
 const emptyForm: CashFlow = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', amount: 0, description: '', category: '', bank_account_id: null }
 
 export default function CashFlowPage() {
+  const { selectedId } = useCompany()
   const [entries, setEntries] = useState<CashFlow[]>([])
   const [form, setForm] = useState<CashFlow>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
@@ -26,8 +28,10 @@ export default function CashFlowPage() {
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
 
   const fetchAll = async () => {
+    let q = supabase.from('sinchai_cash_flow').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(100)
+    if (selectedId) q = q.eq('company_id', selectedId)
     const [{ data: entries }, { data: cats }, { data: ob }, { data: accounts }] = await Promise.all([
-      supabase.from('sinchai_cash_flow').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(100),
+      q,
       supabase.from('sinchai_categories').select('*').order('name'),
       supabase.from('sinchai_opening_balances').select('*').eq('module', 'cash_flow').single(),
       supabase.from('sinchai_bank_accounts').select('*').order('name'),
@@ -41,11 +45,11 @@ export default function CashFlowPage() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { fetchAll() }, [selectedId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { date: form.date, type: form.type, amount: form.amount, description: form.description, category: form.category, bank_account_id: form.bank_account_id || null }
+    const payload = { date: form.date, type: form.type, amount: form.amount, description: form.description, category: form.category, bank_account_id: form.bank_account_id || null, company_id: selectedId }
     if (editId) { await supabase.from('sinchai_cash_flow').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_cash_flow').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); fetchAll()

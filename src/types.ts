@@ -62,4 +62,9 @@ export interface MonthlySummary {
   stock_value: number
 }
 
+export interface Company {
+  id: number
+  name: string
+}
+
 export type Tab = 'dashboard' | 'cashflow' | 'loans' | 'receivables' | 'inventory'

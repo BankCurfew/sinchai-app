@@ -8,6 +8,7 @@ import BroughtForwardBar from './shared/BroughtForwardBar'
 import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
+import { useCompany } from '../lib/company'
 
 const emptyForm: Loan = { due_date: format(new Date(), 'yyyy-MM-dd'), principal: 0, interest: 0, interest_rate: 0, loan_type: '', status: 'pending', description: '' }
 const statusMap: Record<string, { label: string; variant: 'success' | 'danger' | 'warning' }> = {
@@ -15,6 +16,7 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'danger' |
 }
 
 export default function LoansPage() {
+  const { selectedId } = useCompany()
   const [entries, setEntries] = useState<Loan[]>([])
   const [form, setForm] = useState<Loan>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
@@ -28,8 +30,10 @@ export default function LoansPage() {
   const [interestOverride, setInterestOverride] = useState(false)
 
   const fetchAll = async () => {
+    let q = supabase.from('sinchai_loans').select('*').order('due_date').limit(100)
+    if (selectedId) q = q.eq('company_id', selectedId)
     const [{ data }, { data: ob }, { data: types }] = await Promise.all([
-      supabase.from('sinchai_loans').select('*').order('due_date').limit(100),
+      q,
       supabase.from('sinchai_opening_balances').select('*').eq('module', 'loans').single(),
       supabase.from('sinchai_loan_types').select('*').order('name'),
     ])
@@ -38,7 +42,7 @@ export default function LoansPage() {
     setLoanTypes((types || []).map((t: { name: string }) => t.name))
     setLoading(false)
   }
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { fetchAll() }, [selectedId])
 
   const calcMonthlyInterest = (principal: number, ratePerYear: number) => {
     if (ratePerYear <= 0 || principal <= 0) return 0
@@ -52,7 +56,7 @@ export default function LoansPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { due_date: form.due_date, principal: form.principal, interest: form.interest, interest_rate: form.interest_rate, loan_type: form.loan_type, status: form.status, description: form.description }
+    const payload = { due_date: form.due_date, principal: form.principal, interest: form.interest, interest_rate: form.interest_rate, loan_type: form.loan_type, status: form.status, description: form.description, company_id: selectedId }
     if (editId) { await supabase.from('sinchai_loans').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_loans').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); setInterestOverride(false); fetchAll()

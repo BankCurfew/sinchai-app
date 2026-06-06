@@ -1,5 +1,6 @@
 import type { Tab } from '../../types'
 import { useTheme } from '../../lib/theme'
+import CompanySelector from './CompanySelector'
 
 const navItems: { key: Tab; label: string; icon: string }[] = [
   { key: 'dashboard', label: 'แดชบอร์ด', icon: '📊' },
@@ -23,9 +24,12 @@ export default function Sidebar({ activeTab, onTabChange, onExport, onLogout }: 
     <>
       {/* Desktop Sidebar */}
       <nav className="hidden md:flex fixed top-0 left-0 bottom-0 w-60 bg-slate-950 border-r border-slate-700 flex-col z-50">
-        <div className="px-5 py-6 border-b border-slate-700/50">
-          <h1 className="text-xl font-bold text-white tracking-tight">สินชัย</h1>
-          <p className="text-xs text-slate-500 mt-1">ระบบบริหารกระแสเงินสด</p>
+        <div className="px-5 py-6 border-b border-slate-700/50 space-y-3">
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight">สินชัย</h1>
+            <p className="text-xs text-slate-500 mt-1">ระบบบริหารกระแสเงินสด</p>
+          </div>
+          <CompanySelector />
         </div>
 
         <div className="flex-1 p-2 space-y-0.5">
