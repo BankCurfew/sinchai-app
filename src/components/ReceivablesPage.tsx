@@ -75,7 +75,7 @@ export default function ReceivablesPage() {
           <table className="w-full text-sm">
             <thead><tr className="bg-slate-700/50">
               {['ชื่อลูกหนี้', 'จำนวน (฿)', 'วันครบกำหนด', 'สถานะ', 'คาดว่าจะได้รับ', 'หมายเหตุ', 'จัดการ'].map((h, i) => (
-                <th key={h} className={`px-4 py-2.5 text-[0.7rem] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${i === 1 ? 'text-right' : 'text-left'}`}>{h}</th>
+                <th key={h} className={`px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${i === 1 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>

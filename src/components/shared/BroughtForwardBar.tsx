@@ -28,7 +28,7 @@ export default function BroughtForwardBar({ date, items, onEdit }: Props) {
       <div className="flex flex-wrap gap-4 md:gap-8 flex-1">
         {items.map((item, i) => (
           <div key={i} className="flex flex-col">
-            <span className="text-[0.7rem] text-slate-400">{item.label}</span>
+            <span className="text-xs text-slate-400">{item.label}</span>
             <span className={`text-[0.95rem] font-semibold font-mono ${colorMap[item.color || 'default']}`}>
               {item.value}
             </span>

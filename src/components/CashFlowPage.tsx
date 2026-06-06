@@ -100,7 +100,7 @@ export default function CashFlowPage() {
             <thead>
               <tr className="bg-slate-700/50">
                 {['วันที่', 'ประเภท', 'หมวดหมู่', 'รายละเอียด', 'จำนวน (฿)', 'จัดการ'].map((h, i) => (
-                  <th key={h} className={`px-4 py-2.5 text-[0.7rem] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${i === 4 ? 'text-right' : 'text-left'}`}>{h}</th>
+                  <th key={h} className={`px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${i === 4 ? 'text-right' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -181,7 +181,7 @@ export default function CashFlowPage() {
         </FormField>
         <div className="mt-4 p-4 bg-sky-500/[0.08] rounded-lg border border-sky-500/20">
           <p className="text-xs text-sky-400 font-semibold mb-2">💡 Tips</p>
-          <p className="text-[0.7rem] text-slate-400 leading-relaxed">
+          <p className="text-xs text-slate-400 leading-relaxed">
             เลือกหมวดหมู่ให้ตรงกับประเภทรายจ่าย เพื่อการวิเคราะห์ที่แม่นยำ<br />
             รายละเอียดช่วยให้ค้นหาย้อนหลังได้ง่าย
           </p>

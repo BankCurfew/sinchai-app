@@ -31,7 +31,7 @@ export default function KPICard({ label, value, trend, trendDirection, variant, 
         {value}
       </p>
       {trend && (
-        <p className={`text-[0.7rem] font-medium ${trendDirection === 'up' ? 'text-emerald-400' : 'text-rose-400'}`}>
+        <p className={`text-xs font-medium ${trendDirection === 'up' ? 'text-emerald-400' : 'text-rose-400'}`}>
           {trendDirection === 'up' ? '▲' : '▼'} {trend}
         </p>
       )}

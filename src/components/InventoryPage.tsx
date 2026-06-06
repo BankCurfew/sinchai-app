@@ -98,7 +98,7 @@ export default function InventoryPage() {
           <table className="w-full text-sm">
             <thead><tr className="bg-slate-700/50">
               {['วันที่', 'ประเภท', 'สินค้า', 'จำนวน', 'ราคา/หน่วย', 'มูลค่า', 'จัดการ'].map((h, i) => (
-                <th key={h} className={`px-4 py-2.5 text-[0.7rem] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${[3,4,5].includes(i) ? 'text-right' : 'text-left'}`}>{h}</th>
+                <th key={h} className={`px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${[3,4,5].includes(i) ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>

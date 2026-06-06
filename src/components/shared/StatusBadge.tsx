@@ -12,7 +12,7 @@ const styles: Record<string, string> = {
 
 export default function StatusBadge({ variant, children }: Props) {
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[0.65rem] font-semibold ${styles[variant]}`}>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${styles[variant]}`}>
       {children}
     </span>
   )

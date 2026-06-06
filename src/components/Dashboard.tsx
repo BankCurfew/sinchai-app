@@ -181,7 +181,7 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
           <h2 className="text-base font-semibold text-white">ประมาณการกระแสเงินสด — {timeRange.label}</h2>
           <div className="flex gap-4">
             {[{ label: 'รายรับ', color: '#34d399' }, { label: 'รายจ่าย', color: '#fb7185' }, { label: 'ผ่อนชำระ', color: '#a78bfa' }, { label: 'สุทธิ', color: '#ffffff' }].map(l => (
-              <div key={l.label} className="flex items-center gap-1.5 text-[0.7rem] text-slate-400">
+              <div key={l.label} className="flex items-center gap-1.5 text-xs text-slate-400">
                 <div className="w-2 h-2 rounded-full" style={{ background: l.color }} />
                 {l.label}
               </div>
@@ -250,7 +250,7 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-slate-200 font-medium truncate">{l.description || 'เงินกู้'}</p>
-                    <p className="text-[0.65rem] text-slate-500">{days < 0 ? `เลยกำหนด ${-days} วัน` : `ครบกำหนด ${l.due_date} (${days} วัน)`}</p>
+                    <p className="text-xs text-slate-500">{days < 0 ? `เลยกำหนด ${-days} วัน` : `ครบกำหนด ${l.due_date} (${days} วัน)`}</p>
                   </div>
                   <span className={`font-mono text-sm font-semibold ${days < 0 ? 'text-rose-400' : 'text-white'}`}>
                     -{fmt(Number(l.principal) + Number(l.interest))} ฿
@@ -277,7 +277,7 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
             <thead>
               <tr className="bg-slate-700/50">
                 {['เดือน', 'รายรับ', 'รายจ่าย', 'ผ่อนชำระ', 'ลูกหนี้คาดรับ', 'สุทธิ', 'เงินสดคงเหลือ'].map((h, i) => (
-                  <th key={h} className={`px-4 py-2.5 text-[0.7rem] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${i > 0 ? 'text-right' : 'text-left'}`}>{h}</th>
+                  <th key={h} className={`px-4 py-2.5 text-xs font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${i > 0 ? 'text-right' : 'text-left'}`}>{h}</th>
                 ))}
               </tr>
             </thead>

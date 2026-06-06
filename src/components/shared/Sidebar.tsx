@@ -25,7 +25,7 @@ export default function Sidebar({ activeTab, onTabChange, onExport, onLogout }: 
       <nav className="hidden md:flex fixed top-0 left-0 bottom-0 w-60 bg-slate-950 border-r border-slate-700 flex-col z-50">
         <div className="px-5 py-6 border-b border-slate-700/50">
           <h1 className="text-xl font-bold text-white tracking-tight">สินชัย</h1>
-          <p className="text-[0.7rem] text-slate-500 mt-1">ระบบบริหารกระแสเงินสด</p>
+          <p className="text-xs text-slate-500 mt-1">ระบบบริหารกระแสเงินสด</p>
         </div>
 
         <div className="flex-1 p-2 space-y-0.5">
@@ -91,7 +91,7 @@ export default function Sidebar({ activeTab, onTabChange, onExport, onLogout }: 
               }`}
             >
               <span className="text-base">{item.icon}</span>
-              <span className="text-[0.55rem] truncate w-full text-center">{item.label}</span>
+              <span className="text-xs truncate w-full text-center">{item.label}</span>
             </button>
           ))}
           <button
@@ -99,7 +99,7 @@ export default function Sidebar({ activeTab, onTabChange, onExport, onLogout }: 
             className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs text-slate-500 min-w-0"
           >
             <span className="text-base">{theme === 'dark' ? '☀️' : '🌙'}</span>
-            <span className="text-[0.55rem]">โหมด</span>
+            <span className="text-xs">โหมด</span>
           </button>
         </div>
       </nav>
