@@ -61,9 +61,10 @@ export default function CashFlowPage() {
   const handleDelete = async (id: number) => { if (!confirm('ลบรายการนี้?')) return; await supabase.from('sinchai_cash_flow').delete().eq('id', id); fetchAll() }
   const handleAddCat = async () => { if (!newCategory.trim()) return; await supabase.from('sinchai_categories').insert({ type: form.type, name: newCategory.trim() }); setForm({ ...form, category: newCategory.trim() }); setNewCategory(''); setShowAddCat(false); fetchAll() }
 
+  const totalBf = entries.reduce((s, e) => s + (e.type === 'bf' ? Number(e.amount) : 0), 0)
   const totalIn = entries.reduce((s, e) => s + (e.type === 'in' ? Number(e.amount) : 0), 0)
   const totalOut = entries.reduce((s, e) => s + (e.type === 'out' ? Number(e.amount) : 0), 0)
-  const currentBalance = openingBalance + totalIn - totalOut
+  const currentBalance = openingBalance + totalBf + totalIn - totalOut
   const fmt = (n: number) => n.toLocaleString('th-TH')
   const currentCategories = (form.type === 'bf' ? [] : categories[form.type]) || []
 

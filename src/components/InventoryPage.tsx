@@ -58,8 +58,8 @@ export default function InventoryPage() {
     for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
       if (!s[e.item]) s[e.item] = { qty: 0, value: 0 }
       const v = Number(e.quantity) * Number(e.unit_price)
-      if (e.type === 'in') { s[e.item].qty += Number(e.quantity); s[e.item].value += v }
-      else { s[e.item].qty -= Number(e.quantity); s[e.item].value -= v }
+      if (e.type === 'in' || e.type === 'bf') { s[e.item].qty += Number(e.quantity); s[e.item].value += v }
+      else if (e.type === 'out') { s[e.item].qty -= Number(e.quantity); s[e.item].value -= v }
     }
     return s
   }, [entries])

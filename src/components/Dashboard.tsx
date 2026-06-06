@@ -60,8 +60,8 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
     for (const e of [...inventory].sort((a, b) => a.date.localeCompare(b.date))) {
       if (!s[e.item]) s[e.item] = { qty: 0, value: 0 }
       const v = Number(e.quantity) * Number(e.unit_price)
-      if (e.type === 'in') { s[e.item].qty += Number(e.quantity); s[e.item].value += v }
-      else { s[e.item].qty -= Number(e.quantity); s[e.item].value -= v }
+      if (e.type === 'in' || e.type === 'bf') { s[e.item].qty += Number(e.quantity); s[e.item].value += v }
+      else if (e.type === 'out') { s[e.item].qty -= Number(e.quantity); s[e.item].value -= v }
     }
     return s
   }, [inventory])
@@ -73,17 +73,17 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
 
     return monthList.map((month, idx) => {
       const ms = format(month, 'yyyy-MM'), label = format(month, 'MMM yy', { locale: th })
-      const cfIn = cashFlow.filter(e => e.type === 'in' && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.amount), 0)
+      const cfIn = cashFlow.filter(e => (e.type === 'in' || e.type === 'bf') && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.amount), 0)
       const cfOut = cashFlow.filter(e => e.type === 'out' && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.amount), 0)
       const lp = loans.filter(l => l.due_date.startsWith(ms)).reduce((s, l) => s + Number(l.principal), 0)
       const li = loans.filter(l => l.due_date.startsWith(ms)).reduce((s, l) => s + Number(l.interest), 0)
       const lt = lp + li
       const re = receivables.filter(r => r.status !== 'received' && (r.expected_date || r.due_date).startsWith(ms)).reduce((s, r) => s + Number(r.amount), 0)
-      const invIn = inventory.filter(e => e.type === 'in' && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.quantity) * Number(e.unit_price), 0)
+      const invIn = inventory.filter(e => (e.type === 'in' || e.type === 'bf') && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.quantity) * Number(e.unit_price), 0)
       const invOut = inventory.filter(e => e.type === 'out' && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.quantity) * Number(e.unit_price), 0)
 
       if (idx === 0) {
-        rc += cashFlow.filter(e => e.type === 'in').reduce((s, e) => s + Number(e.amount), 0) - cashFlow.filter(e => e.type === 'out').reduce((s, e) => s + Number(e.amount), 0)
+        rc += cashFlow.filter(e => e.type === 'in' || e.type === 'bf').reduce((s, e) => s + Number(e.amount), 0) - cashFlow.filter(e => e.type === 'out').reduce((s, e) => s + Number(e.amount), 0)
         rl += loans.filter(l => l.status !== 'paid').reduce((s, l) => s + Number(l.principal), 0)
         rr += crp; rs += tsv
       } else { rc += cfIn + re - cfOut - lt; rl -= lp; rr -= re; rs += invIn - invOut }
@@ -106,9 +106,10 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
 
   if (loading) return <div className="text-center py-20 text-slate-500">กำลังโหลดข้อมูล...</div>
 
+  const totalBf = cashFlow.reduce((s, e) => s + (e.type === 'bf' ? Number(e.amount) : 0), 0)
   const totalIn = cashFlow.reduce((s, e) => s + (e.type === 'in' ? Number(e.amount) : 0), 0)
   const totalOut = cashFlow.reduce((s, e) => s + (e.type === 'out' ? Number(e.amount) : 0), 0)
-  const currentCash = ob.cash_flow + totalIn - totalOut
+  const currentCash = ob.cash_flow + totalBf + totalIn - totalOut
   const pendingLoans = loans.filter(l => l.status !== 'paid')
   const totalDebt = ob.loans + pendingLoans.reduce((s, l) => s + Number(l.principal), 0)
   const pendingRecv = receivables.filter(r => r.status !== 'received')
