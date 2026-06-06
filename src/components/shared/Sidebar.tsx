@@ -35,7 +35,7 @@ export default function Sidebar({ activeTab, onTabChange, onExport, onLogout }: 
               onClick={() => onTabChange(item.key)}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === item.key
-                  ? 'bg-sky-500/15 text-sky-400'
+                  ? 'bg-sky-500/15 text-sky-400 border-l-3 border-l-sky-500'
                   : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-200'
               }`}
             >
@@ -79,27 +79,26 @@ export default function Sidebar({ activeTab, onTabChange, onExport, onLogout }: 
         )}
       </nav>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700 z-50 safe-bottom">
-        <div className="flex">
+      {/* Mobile Bottom Nav — icon-only for clarity */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700 z-50">
+        <div className="flex pb-[env(safe-area-inset-bottom)]">
           {navItems.map((item) => (
             <button
               key={item.key}
               onClick={() => onTabChange(item.key)}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs transition-colors min-w-0 ${
+              className={`flex-1 flex flex-col items-center py-3 transition-colors ${
                 activeTab === item.key ? 'text-sky-400' : 'text-slate-500'
               }`}
             >
-              <span className="text-base">{item.icon}</span>
-              <span className="text-xs truncate w-full text-center">{item.label}</span>
+              <span className="text-xl">{item.icon}</span>
+              {activeTab === item.key && <div className="w-1 h-1 rounded-full bg-sky-400 mt-1" />}
             </button>
           ))}
           <button
             onClick={toggle}
-            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs text-slate-500 min-w-0"
+            className="flex-1 flex flex-col items-center py-3 text-slate-500"
           >
-            <span className="text-base">{theme === 'dark' ? '☀️' : '🌙'}</span>
-            <span className="text-xs">โหมด</span>
+            <span className="text-xl">{theme === 'dark' ? '☀️' : '🌙'}</span>
           </button>
         </div>
       </nav>

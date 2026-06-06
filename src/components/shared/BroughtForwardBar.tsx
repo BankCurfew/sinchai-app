@@ -25,7 +25,7 @@ export default function BroughtForwardBar({ date, items, onEdit }: Props) {
           <button onClick={onEdit} className="ml-2 text-xs text-slate-500 hover:text-sky-400 underline">แก้ไข</button>
         )}
       </div>
-      <div className="flex flex-wrap gap-4 md:gap-8 flex-1">
+      <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 md:gap-8 flex-1">
         {items.map((item, i) => (
           <div key={i} className="flex flex-col">
             <span className="text-xs text-slate-400">{item.label}</span>

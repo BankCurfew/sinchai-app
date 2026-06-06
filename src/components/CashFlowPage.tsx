@@ -8,6 +8,7 @@ import BroughtForwardBar from './shared/BroughtForwardBar'
 import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
+import TypeSelector, { cashFlowOptions } from './shared/TypeSelector'
 
 const emptyForm: CashFlow = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', amount: 0, description: '', category: '', bank_account_id: null }
 
@@ -58,7 +59,7 @@ export default function CashFlowPage() {
   const totalOut = entries.reduce((s, e) => s + (e.type === 'out' ? Number(e.amount) : 0), 0)
   const currentBalance = openingBalance + totalIn - totalOut
   const fmt = (n: number) => n.toLocaleString('th-TH')
-  const currentCategories = categories[form.type] || []
+  const currentCategories = (form.type === 'bf' ? [] : categories[form.type]) || []
 
   return (
     <div className="space-y-6">
@@ -113,14 +114,14 @@ export default function CashFlowPage() {
                 <tr key={entry.id} className={`border-b border-slate-700/30 hover:bg-sky-500/5 transition-colors ${i % 2 === 1 ? 'bg-slate-800/30' : ''}`}>
                   <td className="px-4 py-2.5 text-slate-300">{entry.date}</td>
                   <td className="px-4 py-2.5">
-                    <StatusBadge variant={entry.type === 'in' ? 'success' : 'danger'}>
-                      {entry.type === 'in' ? 'เงินเข้า' : 'เงินออก'}
+                    <StatusBadge variant={entry.type === 'bf' ? 'info' : entry.type === 'in' ? 'success' : 'danger'}>
+                      {entry.type === 'bf' ? 'ยกมา' : entry.type === 'in' ? 'เงินเข้า' : 'เงินออก'}
                     </StatusBadge>
                   </td>
                   <td className="px-4 py-2.5 text-slate-400">{entry.category}</td>
                   <td className="px-4 py-2.5 text-slate-300">{entry.description}</td>
-                  <td className={`px-4 py-2.5 text-right font-mono font-medium ${entry.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {entry.type === 'in' ? '+' : '-'}{fmt(Number(entry.amount))}
+                  <td className={`px-4 py-2.5 text-right font-mono font-medium ${entry.type === 'bf' ? 'text-sky-400' : entry.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {entry.type === 'bf' ? '' : entry.type === 'in' ? '+' : '-'}{fmt(Number(entry.amount))}
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex gap-1">
@@ -142,10 +143,7 @@ export default function CashFlowPage() {
             <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required />
           </FormField>
           <FormField label="ประเภท">
-            <select value={form.type} onChange={e => { setForm({ ...form, type: e.target.value as 'in' | 'out', category: '' }); setShowAddCat(false) }} className={selectClass}>
-              <option value="in">เงินเข้า</option>
-              <option value="out">เงินออก</option>
-            </select>
+            <TypeSelector value={form.type} onChange={v => { setForm({ ...form, type: v as 'in' | 'out', category: '' }); setShowAddCat(false) }} options={cashFlowOptions} />
           </FormField>
         </div>
         <FormField label="จำนวนเงิน (฿)">
@@ -156,7 +154,7 @@ export default function CashFlowPage() {
             <div className="flex gap-2">
               <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={`${selectClass} flex-1`}>
                 <option value="">เลือกหมวดหมู่...</option>
-                {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                {currentCategories.map((c: string) => <option key={c} value={c}>{c}</option>)}
               </select>
               <button type="button" onClick={() => setShowAddCat(true)} className="px-3 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 whitespace-nowrap">+ เพิ่ม</button>
             </div>

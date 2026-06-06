@@ -1,7 +1,7 @@
 export interface CashFlow {
   id?: number
   date: string
-  type: 'in' | 'out'
+  type: 'in' | 'out' | 'bf'
   amount: number
   description: string
   category: string
@@ -44,7 +44,7 @@ export interface Receivable {
 export interface InventoryEntry {
   id?: number
   date: string
-  type: 'in' | 'out'
+  type: 'in' | 'out' | 'bf'
   item: string
   quantity: number
   unit_price: number

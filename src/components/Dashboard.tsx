@@ -177,9 +177,9 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
 
       {/* Cash Flow Projection Chart */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <h2 className="text-base font-semibold text-white">ประมาณการกระแสเงินสด — {timeRange.label}</h2>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-3">
             {[{ label: 'รายรับ', color: '#34d399' }, { label: 'รายจ่าย', color: '#fb7185' }, { label: 'ผ่อนชำระ', color: '#a78bfa' }, { label: 'สุทธิ', color: '#ffffff' }].map(l => (
               <div key={l.label} className="flex items-center gap-1.5 text-xs text-slate-400">
                 <div className="w-2 h-2 rounded-full" style={{ background: l.color }} />
@@ -264,7 +264,7 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
 
       {/* Projection Tables */}
       <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-5 py-4">
           <h2 className="text-base font-semibold text-white">ประมาณการกระแสเงินสด — รายเดือน</h2>
           <div className="flex gap-2">
             <StatusBadge variant="success">เงินเข้า</StatusBadge>

@@ -8,6 +8,7 @@ import BroughtForwardBar from './shared/BroughtForwardBar'
 import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
+import TypeSelector, { inventoryOptions } from './shared/TypeSelector'
 
 const emptyForm: InventoryEntry = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', item: '', quantity: 0, unit_price: 0 }
 
@@ -19,14 +20,19 @@ export default function InventoryPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [openingBalance, setOpeningBalance] = useState(0)
   const [obDate, setObDate] = useState('')
+  const [itemNames, setItemNames] = useState<string[]>([])
+  const [newItem, setNewItem] = useState('')
+  const [showAddItem, setShowAddItem] = useState(false)
 
   const fetchAll = async () => {
-    const [{ data }, { data: ob }] = await Promise.all([
+    const [{ data }, { data: ob }, { data: items }] = await Promise.all([
       supabase.from('sinchai_inventory').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(200),
       supabase.from('sinchai_opening_balances').select('*').eq('module', 'inventory').single(),
+      supabase.from('sinchai_items').select('*').order('name'),
     ])
     setEntries(data || [])
     if (ob) { setOpeningBalance(Number(ob.amount)); setObDate(ob.as_of_date) }
+    setItemNames((items || []).map(i => i.name))
     setLoading(false)
   }
   useEffect(() => { fetchAll() }, [])
@@ -107,7 +113,7 @@ export default function InventoryPage() {
               : entries.map((e, i) => (
                 <tr key={e.id} className={`border-b border-slate-700/30 hover:bg-sky-500/5 ${i % 2 === 1 ? 'bg-slate-800/30' : ''}`}>
                   <td className="px-4 py-2.5 text-slate-300">{e.date}</td>
-                  <td className="px-4 py-2.5"><StatusBadge variant={e.type === 'in' ? 'success' : 'danger'}>{e.type === 'in' ? 'สั่งเข้า' : 'ขายออก'}</StatusBadge></td>
+                  <td className="px-4 py-2.5"><StatusBadge variant={e.type === 'bf' ? 'info' : e.type === 'in' ? 'success' : 'danger'}>{e.type === 'bf' ? 'ยกมา' : e.type === 'in' ? 'สั่งเข้า' : 'ขายออก'}</StatusBadge></td>
                   <td className="px-4 py-2.5 text-white font-medium">{e.item}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-slate-300">{fmt(Number(e.quantity))}</td>
                   <td className="px-4 py-2.5 text-right font-mono text-slate-300">{fmt(Number(e.unit_price))}</td>
@@ -129,12 +135,26 @@ export default function InventoryPage() {
         <div className="grid grid-cols-2 gap-3">
           <FormField label="วันที่"><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required /></FormField>
           <FormField label="ประเภท">
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as 'in' | 'out' })} className={selectClass}>
-              <option value="in">สั่งเข้า</option><option value="out">ขายออก</option>
-            </select>
+            <TypeSelector value={form.type} onChange={v => setForm({ ...form, type: v as 'in' | 'out' })} options={inventoryOptions} />
           </FormField>
         </div>
-        <FormField label="ชื่อสินค้า"><input type="text" value={form.item} onChange={e => setForm({ ...form, item: e.target.value })} placeholder="ชื่อสินค้า" className={inputClass} required /></FormField>
+        <FormField label="ชื่อสินค้า">
+          {!showAddItem ? (
+            <div className="flex gap-2">
+              <select value={form.item} onChange={e => setForm({ ...form, item: e.target.value })} className={`${selectClass} flex-1`}>
+                <option value="">เลือกสินค้า...</option>
+                {itemNames.map(n => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <button type="button" onClick={() => setShowAddItem(true)} className="px-3 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 whitespace-nowrap">+ เพิ่ม</button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input type="text" value={newItem} onChange={e => setNewItem(e.target.value)} placeholder="ชื่อสินค้าใหม่..." className={`${inputClass} flex-1`} autoFocus />
+              <button type="button" onClick={async () => { if (!newItem.trim()) return; await supabase.from('sinchai_items').insert({ name: newItem.trim() }); setForm({ ...form, item: newItem.trim() }); setNewItem(''); setShowAddItem(false); fetchAll() }} className="px-3 py-2 rounded-lg bg-sky-500 text-white text-sm">เพิ่ม</button>
+              <button type="button" onClick={() => { setShowAddItem(false); setNewItem('') }} className="px-3 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm">ยกเลิก</button>
+            </div>
+          )}
+        </FormField>
         <div className="grid grid-cols-2 gap-3">
           <FormField label="จำนวน"><input type="number" min="0.01" step="0.01" value={form.quantity || ''} placeholder="0" onChange={e => setForm({ ...form, quantity: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
           <FormField label="ราคาต่อหน่วย (฿)"><input type="number" min="0" step="0.01" value={form.unit_price || ''} placeholder="0.00" onChange={e => setForm({ ...form, unit_price: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>

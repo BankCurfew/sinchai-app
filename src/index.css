@@ -113,3 +113,9 @@ body {
 
 /* Login page light mode */
 :root.light .min-h-screen.bg-slate-900.flex { background-color: #f1f5f9 !important; }
+
+/* Light mode TypeSelector */
+:root.light .bg-emerald-500\/20 { background-color: rgba(16,185,129,0.12) !important; }
+:root.light .bg-rose-500\/20 { background-color: rgba(225,29,72,0.12) !important; }
+:root.light .border-emerald-500\/50 { border-color: rgba(5,150,105,0.5) !important; }
+:root.light .border-rose-500\/50 { border-color: rgba(225,29,72,0.5) !important; }
