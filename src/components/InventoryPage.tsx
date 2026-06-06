@@ -132,12 +132,10 @@ export default function InventoryPage() {
       </div>
 
       <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มรายการสต๊อก'} onSubmit={handleSubmit}>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="วันที่"><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required /></FormField>
-          <FormField label="ประเภท">
-            <TypeSelector value={form.type} onChange={v => setForm({ ...form, type: v as 'in' | 'out' })} options={inventoryOptions} />
-          </FormField>
-        </div>
+        <FormField label="วันที่"><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required /></FormField>
+        <FormField label="ประเภท">
+          <TypeSelector value={form.type} onChange={v => setForm({ ...form, type: v as 'in' | 'out' })} options={inventoryOptions} />
+        </FormField>
         <FormField label="ชื่อสินค้า">
           {!showAddItem ? (
             <div className="flex gap-2">
@@ -155,7 +153,7 @@ export default function InventoryPage() {
             </div>
           )}
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="จำนวน"><input type="number" min="0.01" step="0.01" value={form.quantity || ''} placeholder="0" onChange={e => setForm({ ...form, quantity: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
           <FormField label="ราคาต่อหน่วย (฿)"><input type="number" min="0" step="0.01" value={form.unit_price || ''} placeholder="0.00" onChange={e => setForm({ ...form, unit_price: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
         </div>

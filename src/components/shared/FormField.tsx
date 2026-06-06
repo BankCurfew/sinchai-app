@@ -9,7 +9,7 @@ interface Props {
 export default function FormField({ label, children }: Props) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-300 mb-1.5">{label}</label>
+      <label className="block text-sm font-medium text-slate-300 mb-2">{label}</label>
       {children}
     </div>
   )

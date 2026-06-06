@@ -138,14 +138,12 @@ export default function CashFlowPage() {
 
       {/* Slide-out Form */}
       <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null); setForm({ ...emptyForm }) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มรายการใหม่'} onSubmit={handleSubmit} submitLabel={editId ? 'บันทึกการแก้ไข' : 'บันทึกรายการ'}>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="วันที่">
-            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required />
-          </FormField>
-          <FormField label="ประเภท">
-            <TypeSelector value={form.type} onChange={v => { setForm({ ...form, type: v as 'in' | 'out', category: '' }); setShowAddCat(false) }} options={cashFlowOptions} />
-          </FormField>
-        </div>
+        <FormField label="วันที่">
+          <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required />
+        </FormField>
+        <FormField label="ประเภท">
+          <TypeSelector value={form.type} onChange={v => { setForm({ ...form, type: v as 'in' | 'out', category: '' }); setShowAddCat(false) }} options={cashFlowOptions} />
+        </FormField>
         <FormField label="จำนวนเงิน (฿)">
           <input type="number" min="0.01" step="0.01" value={form.amount || ''} placeholder="0.00" onChange={e => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required />
         </FormField>

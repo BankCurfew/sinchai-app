@@ -104,11 +104,11 @@ export default function ReceivablesPage() {
 
       <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มลูกหนี้'} onSubmit={handleSubmit}>
         <FormField label="ชื่อลูกหนี้"><input type="text" value={form.debtor_name} onChange={e => setForm({ ...form, debtor_name: e.target.value })} placeholder="ชื่อบริษัท/บุคคล" className={inputClass} required /></FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="จำนวนเงิน (฿)"><input type="number" min="0.01" step="0.01" value={form.amount || ''} placeholder="0.00" onChange={e => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
           <FormField label="วันครบกำหนด"><input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} className={inputClass} required /></FormField>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="สถานะ">
             <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value as Receivable['status'] })} className={selectClass}>
               <option value="pending">รอรับ</option><option value="received">รับแล้ว</option><option value="overdue">เลยกำหนด</option><option value="partial">รับบางส่วน</option>

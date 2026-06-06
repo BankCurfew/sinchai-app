@@ -42,7 +42,7 @@ export default function SlideOutForm({ open, onClose, title, onSubmit, submitLab
 
         {/* Body */}
         <form onSubmit={onSubmit} className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
             {children}
           </div>
 

@@ -104,7 +104,7 @@ export default function LoansPage() {
 
       <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มรายการผ่อนชำระ'} onSubmit={handleSubmit}>
         <FormField label="วันครบกำหนด"><input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} className={inputClass} required /></FormField>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="เงินต้น (฿)"><input type="number" min="0" step="0.01" value={form.principal || ''} placeholder="0.00" onChange={e => setForm({ ...form, principal: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
           <FormField label="ดอกเบี้ย (฿)"><input type="number" min="0" step="0.01" value={form.interest || ''} placeholder="0.00" onChange={e => setForm({ ...form, interest: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
         </div>
