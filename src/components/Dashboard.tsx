@@ -82,7 +82,7 @@ export default function Dashboard() {
   const handleExport = () => {
     exportToExcel([
       {
-        name: 'Cash Flow',
+        name: 'กระแสเงินสด',
         data: cashFlow.map(e => ({
           'วันที่': e.date,
           'ประเภท': e.type === 'in' ? 'เงินเข้า' : 'เงินออก',
@@ -132,7 +132,7 @@ export default function Dashboard() {
           'รายจ่าย': m.cfOut,
           'ผ่อนชำระ': m.loansDue,
           'ลูกหนี้คาดรับ': m.recExpected,
-          'Net': m.net,
+          'สุทธิ': m.net,
         })),
       },
     ], `sinchai-financial-report-${format(now, 'yyyy-MM-dd')}`)
@@ -142,10 +142,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       {/* Top Summary */}
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800">Dashboard แผน 6 เดือน</h2>
+        <h2 className="text-xl font-bold text-gray-800">แดชบอร์ดแผน 6 เดือน</h2>
         <button onClick={handleExport}
           className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
-          Export Excel
+          ดาวน์โหลด Excel
         </button>
       </div>
 
@@ -188,7 +188,7 @@ export default function Dashboard() {
                 <th className="px-4 py-3 text-right font-medium text-red-600">รายจ่าย</th>
                 <th className="px-4 py-3 text-right font-medium text-orange-600">ผ่อนชำระ</th>
                 <th className="px-4 py-3 text-right font-medium text-yellow-600">ลูกหนี้คาดรับ</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-800">Net</th>
+                <th className="px-4 py-3 text-right font-medium text-gray-800">สุทธิ</th>
               </tr>
             </thead>
             <tbody className="divide-y">

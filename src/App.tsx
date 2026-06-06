@@ -7,11 +7,11 @@ import ReceivablesPage from './components/ReceivablesPage'
 import InventoryPage from './components/InventoryPage'
 
 const tabs: { key: Tab; label: string; icon: string }[] = [
-  { key: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { key: 'cashflow', label: 'Cash Flow', icon: '💰' },
+  { key: 'dashboard', label: 'แดชบอร์ด', icon: '📊' },
+  { key: 'cashflow', label: 'กระแสเงินสด', icon: '💰' },
   { key: 'loans', label: 'เงินกู้', icon: '🏦' },
   { key: 'receivables', label: 'ลูกหนี้', icon: '📋' },
-  { key: 'inventory', label: 'สต๊อก', icon: '📦' },
+  { key: 'inventory', label: 'สต๊อกสินค้า', icon: '📦' },
 ]
 
 export default function App() {
@@ -21,8 +21,8 @@ export default function App() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-indigo-700 text-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">สินชัย — Cash Flow & Financial Planning</h1>
-          <p className="text-indigo-200 text-sm mt-1">ระบบบริหารการเงินและวางแผนกระแสเงินสด</p>
+          <h1 className="text-2xl font-bold">สินชัย — ระบบบริหารกระแสเงินสด</h1>
+          <p className="text-indigo-200 text-sm mt-1">วางแผนการเงิน กระแสเงินสด สินเชื่อ ลูกหนี้ และสต๊อกสินค้า</p>
         </div>
       </header>
 
