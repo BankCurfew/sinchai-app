@@ -8,6 +8,7 @@ import LoansPage from './components/LoansPage'
 import ReceivablesPage from './components/ReceivablesPage'
 import InventoryPage from './components/InventoryPage'
 import LoginPage from './components/LoginPage'
+import MobileCompanyBar from './components/shared/MobileCompanyBar'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
@@ -49,6 +50,7 @@ export default function App() {
 
       <main className="md:ml-60 min-h-screen pb-20 md:pb-0">
         <div className="max-w-[1400px] mx-auto px-4 md:px-8 py-6">
+          <MobileCompanyBar />
           {activeTab === 'dashboard' && <Dashboard exportTrigger={exportTrigger} />}
           {activeTab === 'cashflow' && <CashFlowPage />}
           {activeTab === 'loans' && <LoansPage />}

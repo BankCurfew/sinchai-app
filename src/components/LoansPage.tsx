@@ -9,6 +9,7 @@ import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
 import { useCompany } from '../lib/company'
+import CompanyFormField from './shared/CompanyFormField'
 
 const emptyForm: Loan = { due_date: format(new Date(), 'yyyy-MM-dd'), principal: 0, interest: 0, interest_rate: 0, loan_type: '', status: 'pending', description: '' }
 const statusMap: Record<string, { label: string; variant: 'success' | 'danger' | 'warning' }> = {
@@ -28,6 +29,7 @@ export default function LoansPage() {
   const [newType, setNewType] = useState('')
   const [showAddType, setShowAddType] = useState(false)
   const [interestOverride, setInterestOverride] = useState(false)
+  const [formCompanyId, setFormCompanyId] = useState<number | null>(selectedId)
 
   const fetchAll = async () => {
     let q = supabase.from('sinchai_loans').select('*').order('due_date').limit(100)
@@ -56,7 +58,7 @@ export default function LoansPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { due_date: form.due_date, principal: form.principal, interest: form.interest, interest_rate: form.interest_rate, loan_type: form.loan_type, status: form.status, description: form.description, company_id: selectedId }
+    const payload = { due_date: form.due_date, principal: form.principal, interest: form.interest, interest_rate: form.interest_rate, loan_type: form.loan_type, status: form.status, description: form.description, company_id: formCompanyId }
     if (editId) { await supabase.from('sinchai_loans').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_loans').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); setInterestOverride(false); fetchAll()
@@ -86,7 +88,7 @@ export default function LoansPage() {
         <KPICard label="ยอดคงค้างทั้งหมด" value={`${fmt(remainingDebt)} ฿`} variant="expense" />
       </div>
 
-      <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormOpen(true); setInterestOverride(false) }}
+      <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormCompanyId(selectedId); setFormOpen(true); setInterestOverride(false) }}
         className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold transition-all hover:shadow-lg hover:shadow-sky-500/30">
         + เพิ่มรายการผ่อนชำระ
       </button>
@@ -126,6 +128,7 @@ export default function LoansPage() {
       </div>
 
       <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null); setInterestOverride(false) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มรายการผ่อนชำระ'} onSubmit={handleSubmit}>
+        <CompanyFormField value={formCompanyId} onChange={setFormCompanyId} />
         <FormField label="ประเภทเงินกู้">
           {!showAddType ? (
             <div className="flex gap-2">

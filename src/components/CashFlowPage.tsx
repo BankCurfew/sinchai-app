@@ -9,6 +9,7 @@ import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
 import TypeSelector, { cashFlowOptions } from './shared/TypeSelector'
+import CompanyFormField from './shared/CompanyFormField'
 import { useCompany } from '../lib/company'
 
 const emptyForm: CashFlow = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', amount: 0, description: '', category: '', bank_account_id: null }
@@ -26,6 +27,7 @@ export default function CashFlowPage() {
   const [newCategory, setNewCategory] = useState('')
   const [showAddCat, setShowAddCat] = useState(false)
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
+  const [formCompanyId, setFormCompanyId] = useState<number | null>(selectedId)
 
   const fetchAll = async () => {
     let q = supabase.from('sinchai_cash_flow').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(100)
@@ -49,7 +51,7 @@ export default function CashFlowPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { date: form.date, type: form.type, amount: form.amount, description: form.description, category: form.category, bank_account_id: form.bank_account_id || null, company_id: selectedId }
+    const payload = { date: form.date, type: form.type, amount: form.amount, description: form.description, category: form.category, bank_account_id: form.bank_account_id || null, company_id: formCompanyId }
     if (editId) { await supabase.from('sinchai_cash_flow').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_cash_flow').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); fetchAll()
@@ -92,7 +94,7 @@ export default function CashFlowPage() {
 
       {/* Action Bar */}
       <div className="flex items-center justify-between">
-        <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormOpen(true) }}
+        <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormCompanyId(selectedId); setFormOpen(true) }}
           className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold transition-all hover:shadow-lg hover:shadow-sky-500/30">
           + เพิ่มรายการ
         </button>
@@ -142,6 +144,7 @@ export default function CashFlowPage() {
 
       {/* Slide-out Form */}
       <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null); setForm({ ...emptyForm }) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มรายการใหม่'} onSubmit={handleSubmit} submitLabel={editId ? 'บันทึกการแก้ไข' : 'บันทึกรายการ'}>
+        <CompanyFormField value={formCompanyId} onChange={setFormCompanyId} />
         <FormField label="วันที่">
           <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required />
         </FormField>

@@ -10,6 +10,7 @@ import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
 import TypeSelector, { inventoryOptions } from './shared/TypeSelector'
 import { useCompany } from '../lib/company'
+import CompanyFormField from './shared/CompanyFormField'
 
 const emptyForm: InventoryEntry = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', item: '', quantity: 0, unit_price: 0 }
 
@@ -25,6 +26,7 @@ export default function InventoryPage() {
   const [itemNames, setItemNames] = useState<string[]>([])
   const [newItem, setNewItem] = useState('')
   const [showAddItem, setShowAddItem] = useState(false)
+  const [formCompanyId, setFormCompanyId] = useState<number | null>(selectedId)
 
   const fetchAll = async () => {
     let q = supabase.from('sinchai_inventory').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(200)
@@ -43,7 +45,7 @@ export default function InventoryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { date: form.date, type: form.type, item: form.item, quantity: form.quantity, unit_price: form.unit_price, company_id: selectedId }
+    const payload = { date: form.date, type: form.type, item: form.item, quantity: form.quantity, unit_price: form.unit_price, company_id: formCompanyId }
     if (editId) { await supabase.from('sinchai_inventory').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_inventory').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); fetchAll()
@@ -98,7 +100,7 @@ export default function InventoryPage() {
         </div>
       )}
 
-      <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormOpen(true) }}
+      <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormCompanyId(selectedId); setFormOpen(true) }}
         className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold transition-all hover:shadow-lg hover:shadow-sky-500/30">
         + เพิ่มรายการ
       </button>
@@ -136,6 +138,7 @@ export default function InventoryPage() {
       </div>
 
       <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มรายการสต๊อก'} onSubmit={handleSubmit}>
+        <CompanyFormField value={formCompanyId} onChange={setFormCompanyId} />
         <FormField label="วันที่"><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required /></FormField>
         <FormField label="ประเภท">
           <TypeSelector value={form.type} onChange={v => setForm({ ...form, type: v as 'in' | 'out' })} options={inventoryOptions} />

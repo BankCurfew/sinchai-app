@@ -9,6 +9,7 @@ import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
 import { useCompany } from '../lib/company'
+import CompanyFormField from './shared/CompanyFormField'
 
 const emptyForm: Receivable = { debtor_name: '', amount: 0, due_date: format(new Date(), 'yyyy-MM-dd'), status: 'pending', expected_date: null, notes: '' }
 const statusMap: Record<string, { label: string; variant: 'success' | 'danger' | 'warning' | 'info' }> = {
@@ -24,6 +25,7 @@ export default function ReceivablesPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [openingBalance, setOpeningBalance] = useState(0)
   const [obDate, setObDate] = useState('')
+  const [formCompanyId, setFormCompanyId] = useState<number | null>(selectedId)
 
   const fetchAll = async () => {
     let q = supabase.from('sinchai_receivables').select('*').order('due_date').limit(100)
@@ -40,7 +42,7 @@ export default function ReceivablesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { debtor_name: form.debtor_name, amount: form.amount, due_date: form.due_date, status: form.status, expected_date: form.expected_date || null, notes: form.notes, company_id: selectedId }
+    const payload = { debtor_name: form.debtor_name, amount: form.amount, due_date: form.due_date, status: form.status, expected_date: form.expected_date || null, notes: form.notes, company_id: formCompanyId }
     if (editId) { await supabase.from('sinchai_receivables').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_receivables').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); fetchAll()
@@ -69,7 +71,7 @@ export default function ReceivablesPage() {
         <KPICard label="เลยกำหนด" value={`${fmt(totalOverdue)} ฿`} variant="expense" />
       </div>
 
-      <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormOpen(true) }}
+      <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormCompanyId(selectedId); setFormOpen(true) }}
         className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold transition-all hover:shadow-lg hover:shadow-sky-500/30">
         + เพิ่มลูกหนี้
       </button>
@@ -107,6 +109,7 @@ export default function ReceivablesPage() {
       </div>
 
       <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มลูกหนี้'} onSubmit={handleSubmit}>
+        <CompanyFormField value={formCompanyId} onChange={setFormCompanyId} />
         <FormField label="ชื่อลูกหนี้"><input type="text" value={form.debtor_name} onChange={e => setForm({ ...form, debtor_name: e.target.value })} placeholder="ชื่อบริษัท/บุคคล" className={inputClass} required /></FormField>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="จำนวนเงิน (฿)"><input type="number" min="0.01" step="0.01" value={form.amount || ''} placeholder="0.00" onChange={e => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
