@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Receivable } from '../types'
 import { format } from 'date-fns'
+import OpeningBalance from './OpeningBalance'
 
 const emptyForm: Receivable = {
   debtor_name: '',
@@ -24,6 +25,7 @@ export default function ReceivablesPage() {
   const [form, setForm] = useState<Receivable>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<number | null>(null)
+  const [openingBalance, setOpeningBalance] = useState(0)
 
   const fetchEntries = async () => {
     const { data } = await supabase
@@ -73,11 +75,23 @@ export default function ReceivablesPage() {
   const totalReceived = entries.filter(e => e.status === 'received').reduce((s, e) => s + Number(e.amount), 0)
   const totalOverdue = entries.filter(e => e.status === 'overdue').reduce((s, e) => s + Number(e.amount), 0)
 
+  const totalOutstanding = openingBalance + totalPending
+
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <OpeningBalance module="receivables" label="ยอดลูกหนี้คงค้างยกมา" onBalanceChange={(amt) => setOpeningBalance(amt)} />
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm text-amber-600 font-medium">ยอดยกมา</p>
+          <p className="text-2xl font-bold text-amber-700">{openingBalance.toLocaleString('th-TH')} ฿</p>
+        </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <p className="text-sm text-yellow-600 font-medium">ยอดค้างรับ</p>
+          <p className="text-sm text-yellow-600 font-medium">ยอดค้างรับทั้งหมด</p>
+          <p className="text-2xl font-bold text-yellow-700">{totalOutstanding.toLocaleString('th-TH')} ฿</p>
+        </div>
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+          <p className="text-sm text-yellow-600 font-medium">ค้างรับ (รายการใหม่)</p>
           <p className="text-2xl font-bold text-yellow-700">{totalPending.toLocaleString('th-TH')} ฿</p>
         </div>
         <div className="bg-green-50 border border-green-200 rounded-xl p-4">

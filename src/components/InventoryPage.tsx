@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import type { InventoryEntry } from '../types'
 import { format } from 'date-fns'
+import OpeningBalance from './OpeningBalance'
 
 const emptyForm: InventoryEntry = {
   date: format(new Date(), 'yyyy-MM-dd'),
@@ -16,6 +17,7 @@ export default function InventoryPage() {
   const [form, setForm] = useState<InventoryEntry>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<number | null>(null)
+  const [openingBalance, setOpeningBalance] = useState(0)
 
   const fetchEntries = async () => {
     const { data } = await supabase
@@ -83,13 +85,21 @@ export default function InventoryPage() {
 
   const totalStockValue = Object.values(stockSummary).reduce((s, v) => s + Math.max(0, v.value), 0)
 
+  const currentStockValue = openingBalance + totalStockValue
+
   return (
     <div className="space-y-6">
+      <OpeningBalance module="inventory" label="มูลค่าสต๊อกยกมา" onBalanceChange={(amt) => setOpeningBalance(amt)} />
+
       {/* Stock Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm text-amber-600 font-medium">ยอดยกมา</p>
+          <p className="text-2xl font-bold text-amber-700">{openingBalance.toLocaleString('th-TH')} ฿</p>
+        </div>
         <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-          <p className="text-sm text-indigo-600 font-medium">มูลค่าสต๊อกรวม</p>
-          <p className="text-2xl font-bold text-indigo-700">{totalStockValue.toLocaleString('th-TH')} ฿</p>
+          <p className="text-sm text-indigo-600 font-medium">มูลค่าสต๊อกปัจจุบัน</p>
+          <p className="text-2xl font-bold text-indigo-700">{currentStockValue.toLocaleString('th-TH')} ฿</p>
         </div>
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
           <p className="text-sm text-gray-600 font-medium">จำนวนรายการสินค้า</p>

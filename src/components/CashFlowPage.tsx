@@ -2,15 +2,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { CashFlow } from '../types'
 import { format } from 'date-fns'
-
-const categories = ['รายได้จากการขาย', 'รายได้อื่นๆ', 'ค่าวัตถุดิบ', 'ค่าแรง', 'ค่าขนส่ง', 'ค่าเช่า', 'ค่าสาธารณูปโภค', 'ค่าใช้จ่ายอื่นๆ', 'อื่นๆ']
+import OpeningBalance from './OpeningBalance'
 
 const emptyForm: CashFlow = {
   date: format(new Date(), 'yyyy-MM-dd'),
   type: 'in',
   amount: 0,
   description: '',
-  category: 'อื่นๆ',
+  category: '',
 }
 
 export default function CashFlowPage() {
@@ -18,6 +17,19 @@ export default function CashFlowPage() {
   const [form, setForm] = useState<CashFlow>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<number | null>(null)
+  const [openingBalance, setOpeningBalance] = useState(0)
+  const [categories, setCategories] = useState<{ in: string[]; out: string[] }>({ in: [], out: [] })
+  const [newCategory, setNewCategory] = useState('')
+  const [showAddCategory, setShowAddCategory] = useState(false)
+
+  const fetchCategories = async () => {
+    const { data } = await supabase.from('sinchai_categories').select('*').order('name')
+    const cats: { in: string[]; out: string[] } = { in: [], out: [] }
+    for (const c of (data || [])) {
+      cats[c.type as 'in' | 'out'].push(c.name)
+    }
+    setCategories(cats)
+  }
 
   const fetchEntries = async () => {
     const { data } = await supabase
@@ -30,12 +42,20 @@ export default function CashFlowPage() {
     setLoading(false)
   }
 
-  useEffect(() => { fetchEntries() }, [])
+  useEffect(() => {
+    fetchCategories()
+    fetchEntries()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const { id, created_at, ...payload } = form as CashFlow & { id?: number; created_at?: string }
-    void id; void created_at;
+    const payload = {
+      date: form.date,
+      type: form.type,
+      amount: form.amount,
+      description: form.description,
+      category: form.category,
+    }
 
     if (editId) {
       await supabase.from('sinchai_cash_flow').update(payload).eq('id', editId)
@@ -58,13 +78,31 @@ export default function CashFlowPage() {
     fetchEntries()
   }
 
+  const handleAddCategory = async () => {
+    if (!newCategory.trim()) return
+    await supabase.from('sinchai_categories').insert({ type: form.type, name: newCategory.trim() })
+    setForm({ ...form, category: newCategory.trim() })
+    setNewCategory('')
+    setShowAddCategory(false)
+    fetchCategories()
+  }
+
+  const currentCategories = categories[form.type] || []
   const totalIn = entries.reduce((s, e) => s + (e.type === 'in' ? Number(e.amount) : 0), 0)
   const totalOut = entries.reduce((s, e) => s + (e.type === 'out' ? Number(e.amount) : 0), 0)
+  const currentBalance = openingBalance + totalIn - totalOut
 
   return (
     <div className="space-y-6">
+      {/* Opening Balance */}
+      <OpeningBalance module="cash_flow" label="ยอดเงินสดยกมา" onBalanceChange={(amt) => setOpeningBalance(amt)} />
+
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm text-amber-600 font-medium">ยอดยกมา</p>
+          <p className="text-2xl font-bold text-amber-700">{openingBalance.toLocaleString('th-TH')} ฿</p>
+        </div>
         <div className="bg-green-50 border border-green-200 rounded-xl p-4">
           <p className="text-sm text-green-600 font-medium">รายรับรวม</p>
           <p className="text-2xl font-bold text-green-700">{totalIn.toLocaleString('th-TH')} ฿</p>
@@ -73,10 +111,10 @@ export default function CashFlowPage() {
           <p className="text-sm text-red-600 font-medium">รายจ่ายรวม</p>
           <p className="text-2xl font-bold text-red-700">{totalOut.toLocaleString('th-TH')} ฿</p>
         </div>
-        <div className={`border rounded-xl p-4 ${totalIn - totalOut >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
-          <p className="text-sm font-medium text-gray-600">ยอดคงเหลือ</p>
-          <p className={`text-2xl font-bold ${totalIn - totalOut >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
-            {(totalIn - totalOut).toLocaleString('th-TH')} ฿
+        <div className={`border rounded-xl p-4 ${currentBalance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
+          <p className="text-sm font-medium text-gray-600">ยอดคงเหลือปัจจุบัน</p>
+          <p className={`text-2xl font-bold ${currentBalance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
+            {currentBalance.toLocaleString('th-TH')} ฿
           </p>
         </div>
       </div>
@@ -92,7 +130,7 @@ export default function CashFlowPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">ประเภท</label>
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as 'in' | 'out' })}
+            <select value={form.type} onChange={e => { setForm({ ...form, type: e.target.value as 'in' | 'out', category: '' }); setShowAddCategory(false) }}
               className="w-full border rounded-lg px-3 py-2">
               <option value="in">เงินเข้า</option>
               <option value="out">เงินออก</option>
@@ -106,10 +144,26 @@ export default function CashFlowPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่</label>
-            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2">
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            {!showAddCategory ? (
+              <div className="flex gap-2">
+                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                  className="flex-1 border rounded-lg px-3 py-2">
+                  <option value="">— เลือกหมวดหมู่ —</option>
+                  {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <button type="button" onClick={() => setShowAddCategory(true)}
+                  className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 text-sm whitespace-nowrap">+ เพิ่ม</button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input type="text" value={newCategory} onChange={e => setNewCategory(e.target.value)}
+                  placeholder="ชื่อหมวดใหม่..." className="flex-1 border rounded-lg px-3 py-2" autoFocus />
+                <button type="button" onClick={handleAddCategory}
+                  className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 text-sm">เพิ่ม</button>
+                <button type="button" onClick={() => { setShowAddCategory(false); setNewCategory('') }}
+                  className="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm">ยกเลิก</button>
+              </div>
+            )}
           </div>
           <div className="md:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label>

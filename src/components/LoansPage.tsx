@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Loan } from '../types'
 import { format } from 'date-fns'
+import OpeningBalance from './OpeningBalance'
 
 const emptyForm: Loan = {
   due_date: format(new Date(), 'yyyy-MM-dd'),
@@ -22,6 +23,7 @@ export default function LoansPage() {
   const [form, setForm] = useState<Loan>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<number | null>(null)
+  const [openingBalance, setOpeningBalance] = useState(0)
 
   const fetchEntries = async () => {
     const { data } = await supabase
@@ -68,11 +70,17 @@ export default function LoansPage() {
 
   const totalPrincipal = entries.reduce((s, e) => s + Number(e.principal), 0)
   const totalInterest = entries.reduce((s, e) => s + Number(e.interest), 0)
-  const totalPending = entries.filter(e => e.status !== 'paid').reduce((s, e) => s + Number(e.principal) + Number(e.interest), 0)
+  const remainingDebt = openingBalance + totalPrincipal - entries.filter(e => e.status === 'paid').reduce((s, e) => s + Number(e.principal), 0)
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <OpeningBalance module="loans" label="ยอดเงินต้นคงค้างยกมา" onBalanceChange={(amt) => setOpeningBalance(amt)} />
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-sm text-amber-600 font-medium">ยอดยกมา</p>
+          <p className="text-2xl font-bold text-amber-700">{openingBalance.toLocaleString('th-TH')} ฿</p>
+        </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
           <p className="text-sm text-blue-600 font-medium">เงินต้นรวม</p>
           <p className="text-2xl font-bold text-blue-700">{totalPrincipal.toLocaleString('th-TH')} ฿</p>
@@ -82,8 +90,8 @@ export default function LoansPage() {
           <p className="text-2xl font-bold text-purple-700">{totalInterest.toLocaleString('th-TH')} ฿</p>
         </div>
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-          <p className="text-sm text-orange-600 font-medium">ยอดค้างชำระ</p>
-          <p className="text-2xl font-bold text-orange-700">{totalPending.toLocaleString('th-TH')} ฿</p>
+          <p className="text-sm text-orange-600 font-medium">ยอดคงค้างทั้งหมด</p>
+          <p className="text-2xl font-bold text-orange-700">{remainingDebt.toLocaleString('th-TH')} ฿</p>
         </div>
       </div>
 
