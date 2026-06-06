@@ -8,88 +8,60 @@ export interface TimeRange {
   endDate?: string
 }
 
-const presets: { label: string; months: number }[] = [
-  { label: '6 เดือน', months: 6 },
-  { label: '12 เดือน', months: 12 },
-]
-
 interface Props {
   onChange: (range: TimeRange) => void
 }
 
 export default function TimeRangeSelector({ onChange }: Props) {
-  const [mode, setMode] = useState<'preset' | 'custom'>('preset')
-  const [selectedPreset, setSelectedPreset] = useState(0)
-  const [customStart, setCustomStart] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
-  const [customEnd, setCustomEnd] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
+  const [mode, setMode] = useState<'6m' | '12m' | 'custom'>('6m')
+  const [customStart, setCustomStart] = useState(format(startOfMonth(new Date()), 'yyyy-MM'))
+  const [customEnd, setCustomEnd] = useState(format(startOfMonth(new Date()), 'yyyy-MM'))
 
-  const handlePreset = (idx: number) => {
-    setSelectedPreset(idx)
-    setMode('preset')
-    onChange({ label: presets[idx].label, months: presets[idx].months })
+  const handlePreset = (m: '6m' | '12m') => {
+    setMode(m)
+    const months = m === '6m' ? 6 : 12
+    onChange({ label: m === '6m' ? '6 เดือน' : 'ทั้งปี', months })
   }
 
   const handleCustom = () => {
     setMode('custom')
-    onChange({
-      label: 'กำหนดเอง',
-      months: 0,
-      startDate: customStart,
-      endDate: customEnd,
-    })
+    onChange({ label: 'กำหนดเอง', months: 0, startDate: customStart + '-01', endDate: customEnd + '-01' })
   }
 
   const handleCustomChange = (start: string, end: string) => {
     setCustomStart(start)
     setCustomEnd(end)
-    onChange({
-      label: 'กำหนดเอง',
-      months: 0,
-      startDate: start,
-      endDate: end,
-    })
+    onChange({ label: 'กำหนดเอง', months: 0, startDate: start + '-01', endDate: end + '-01' })
   }
+
+  const btnClass = (active: boolean) =>
+    `px-4 py-1.5 rounded-md text-xs font-medium transition-all ${
+      active
+        ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30'
+        : 'text-slate-400 hover:text-slate-200'
+    }`
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-sm font-medium text-gray-600">ช่วงเวลา:</span>
-      {presets.map((p, idx) => (
-        <button
-          key={p.label}
-          onClick={() => handlePreset(idx)}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-            mode === 'preset' && selectedPreset === idx
-              ? 'bg-indigo-600 text-white'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-          }`}
-        >
-          {p.label}
-        </button>
-      ))}
-      <button
-        onClick={handleCustom}
-        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-          mode === 'custom'
-            ? 'bg-indigo-600 text-white'
-            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-        }`}
-      >
-        กำหนดเอง
-      </button>
+      <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-0.5">
+        <button onClick={() => handlePreset('6m')} className={btnClass(mode === '6m')}>6 เดือน</button>
+        <button onClick={() => handlePreset('12m')} className={btnClass(mode === '12m')}>ทั้งปี</button>
+        <button onClick={handleCustom} className={btnClass(mode === 'custom')}>กำหนดเอง</button>
+      </div>
       {mode === 'custom' && (
-        <div className="flex items-center gap-2 ml-2">
+        <div className="flex items-center gap-2">
           <input
             type="month"
-            value={customStart.substring(0, 7)}
-            onChange={e => handleCustomChange(e.target.value + '-01', customEnd)}
-            className="border rounded-lg px-2 py-1.5 text-sm"
+            value={customStart}
+            onChange={e => handleCustomChange(e.target.value, customEnd)}
+            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-500"
           />
-          <span className="text-gray-400">ถึง</span>
+          <span className="text-slate-500 text-xs">ถึง</span>
           <input
             type="month"
-            value={customEnd.substring(0, 7)}
-            onChange={e => handleCustomChange(customStart, e.target.value + '-01')}
-            className="border rounded-lg px-2 py-1.5 text-sm"
+            value={customEnd}
+            onChange={e => handleCustomChange(customStart, e.target.value)}
+            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-sky-500"
           />
         </div>
       )}

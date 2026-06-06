@@ -2,223 +2,128 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { CashFlow } from '../types'
 import { format } from 'date-fns'
-import OpeningBalance from './OpeningBalance'
+import { th } from 'date-fns/locale'
+import KPICard from './shared/KPICard'
+import BroughtForwardBar from './shared/BroughtForwardBar'
+import StatusBadge from './shared/StatusBadge'
+import SlideOutForm from './shared/SlideOutForm'
+import FormField, { inputClass, selectClass } from './shared/FormField'
 
-const emptyForm: CashFlow = {
-  date: format(new Date(), 'yyyy-MM-dd'),
-  type: 'in',
-  amount: 0,
-  description: '',
-  category: '',
-}
+const emptyForm: CashFlow = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', amount: 0, description: '', category: '' }
 
 export default function CashFlowPage() {
   const [entries, setEntries] = useState<CashFlow[]>([])
   const [form, setForm] = useState<CashFlow>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<number | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
   const [openingBalance, setOpeningBalance] = useState(0)
+  const [obDate, setObDate] = useState('')
   const [categories, setCategories] = useState<{ in: string[]; out: string[] }>({ in: [], out: [] })
   const [newCategory, setNewCategory] = useState('')
-  const [showAddCategory, setShowAddCategory] = useState(false)
+  const [showAddCat, setShowAddCat] = useState(false)
 
-  const fetchCategories = async () => {
-    const { data } = await supabase.from('sinchai_categories').select('*').order('name')
-    const cats: { in: string[]; out: string[] } = { in: [], out: [] }
-    for (const c of (data || [])) {
-      cats[c.type as 'in' | 'out'].push(c.name)
-    }
-    setCategories(cats)
-  }
-
-  const fetchEntries = async () => {
-    const { data } = await supabase
-      .from('sinchai_cash_flow')
-      .select('*')
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(100)
-    setEntries(data || [])
+  const fetchAll = async () => {
+    const [{ data: entries }, { data: cats }, { data: ob }] = await Promise.all([
+      supabase.from('sinchai_cash_flow').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(100),
+      supabase.from('sinchai_categories').select('*').order('name'),
+      supabase.from('sinchai_opening_balances').select('*').eq('module', 'cash_flow').single(),
+    ])
+    setEntries(entries || [])
+    const c: { in: string[]; out: string[] } = { in: [], out: [] }
+    for (const cat of (cats || [])) c[cat.type as 'in' | 'out'].push(cat.name)
+    setCategories(c)
+    if (ob) { setOpeningBalance(Number(ob.amount)); setObDate(ob.as_of_date) }
     setLoading(false)
   }
 
-  useEffect(() => {
-    fetchCategories()
-    fetchEntries()
-  }, [])
+  useEffect(() => { fetchAll() }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = {
-      date: form.date,
-      type: form.type,
-      amount: form.amount,
-      description: form.description,
-      category: form.category,
-    }
-
-    if (editId) {
-      await supabase.from('sinchai_cash_flow').update(payload).eq('id', editId)
-      setEditId(null)
-    } else {
-      await supabase.from('sinchai_cash_flow').insert(payload)
-    }
-    setForm({ ...emptyForm })
-    fetchEntries()
+    const payload = { date: form.date, type: form.type, amount: form.amount, description: form.description, category: form.category }
+    if (editId) { await supabase.from('sinchai_cash_flow').update(payload).eq('id', editId); setEditId(null) }
+    else { await supabase.from('sinchai_cash_flow').insert(payload) }
+    setForm({ ...emptyForm }); setFormOpen(false); fetchAll()
   }
 
-  const handleEdit = (entry: CashFlow) => {
-    setForm(entry)
-    setEditId(entry.id!)
-  }
+  const handleEdit = (entry: CashFlow) => { setForm(entry); setEditId(entry.id!); setFormOpen(true) }
+  const handleDelete = async (id: number) => { if (!confirm('ลบรายการนี้?')) return; await supabase.from('sinchai_cash_flow').delete().eq('id', id); fetchAll() }
+  const handleAddCat = async () => { if (!newCategory.trim()) return; await supabase.from('sinchai_categories').insert({ type: form.type, name: newCategory.trim() }); setForm({ ...form, category: newCategory.trim() }); setNewCategory(''); setShowAddCat(false); fetchAll() }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('ลบรายการนี้?')) return
-    await supabase.from('sinchai_cash_flow').delete().eq('id', id)
-    fetchEntries()
-  }
-
-  const handleAddCategory = async () => {
-    if (!newCategory.trim()) return
-    await supabase.from('sinchai_categories').insert({ type: form.type, name: newCategory.trim() })
-    setForm({ ...form, category: newCategory.trim() })
-    setNewCategory('')
-    setShowAddCategory(false)
-    fetchCategories()
-  }
-
-  const currentCategories = categories[form.type] || []
   const totalIn = entries.reduce((s, e) => s + (e.type === 'in' ? Number(e.amount) : 0), 0)
   const totalOut = entries.reduce((s, e) => s + (e.type === 'out' ? Number(e.amount) : 0), 0)
   const currentBalance = openingBalance + totalIn - totalOut
+  const fmt = (n: number) => n.toLocaleString('th-TH')
+  const currentCategories = categories[form.type] || []
 
   return (
     <div className="space-y-6">
-      {/* Opening Balance */}
-      <OpeningBalance module="cash_flow" label="ยอดเงินสดยกมา" onBalanceChange={(amt) => setOpeningBalance(amt)} />
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-sm text-amber-600 font-medium">ยอดยกมา</p>
-          <p className="text-2xl font-bold text-amber-700">{openingBalance.toLocaleString('th-TH')} ฿</p>
-        </div>
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <p className="text-sm text-green-600 font-medium">รายรับรวม</p>
-          <p className="text-2xl font-bold text-green-700">{totalIn.toLocaleString('th-TH')} ฿</p>
-        </div>
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-          <p className="text-sm text-red-600 font-medium">รายจ่ายรวม</p>
-          <p className="text-2xl font-bold text-red-700">{totalOut.toLocaleString('th-TH')} ฿</p>
-        </div>
-        <div className={`border rounded-xl p-4 ${currentBalance >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
-          <p className="text-sm font-medium text-gray-600">ยอดคงเหลือปัจจุบัน</p>
-          <p className={`text-2xl font-bold ${currentBalance >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>
-            {currentBalance.toLocaleString('th-TH')} ฿
-          </p>
-        </div>
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-white">กระแสเงินสด</h1>
+        <p className="text-xs text-slate-400 mt-1">บันทึกรายรับ-รายจ่ายประจำวัน</p>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border p-6">
-        <h2 className="text-lg font-semibold mb-4">{editId ? 'แก้ไขรายการ' : 'เพิ่มรายการใหม่'}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">วันที่</label>
-            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ประเภท</label>
-            <select value={form.type} onChange={e => { setForm({ ...form, type: e.target.value as 'in' | 'out', category: '' }); setShowAddCategory(false) }}
-              className="w-full border rounded-lg px-3 py-2">
-              <option value="in">เงินเข้า</option>
-              <option value="out">เงินออก</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">จำนวนเงิน (฿)</label>
-            <input type="number" min="0.01" step="0.01" value={form.amount || ''} placeholder="0.00"
-              onChange={e => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })}
-              className="w-full border rounded-lg px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">หมวดหมู่</label>
-            {!showAddCategory ? (
-              <div className="flex gap-2">
-                <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
-                  className="flex-1 border rounded-lg px-3 py-2">
-                  <option value="">— เลือกหมวดหมู่ —</option>
-                  {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                <button type="button" onClick={() => setShowAddCategory(true)}
-                  className="bg-gray-100 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-200 text-sm whitespace-nowrap">+ เพิ่ม</button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <input type="text" value={newCategory} onChange={e => setNewCategory(e.target.value)}
-                  placeholder="ชื่อหมวดใหม่..." className="flex-1 border rounded-lg px-3 py-2" autoFocus />
-                <button type="button" onClick={handleAddCategory}
-                  className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 text-sm">เพิ่ม</button>
-                <button type="button" onClick={() => { setShowAddCategory(false); setNewCategory('') }}
-                  className="bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm">ยกเลิก</button>
-              </div>
-            )}
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">รายละเอียด</label>
-            <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-              placeholder="อธิบายรายการ..." className="w-full border rounded-lg px-3 py-2" />
-          </div>
-        </div>
-        <div className="mt-4 flex gap-2">
-          <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-            {editId ? 'บันทึกการแก้ไข' : 'เพิ่มรายการ'}
-          </button>
-          {editId && (
-            <button type="button" onClick={() => { setEditId(null); setForm({ ...emptyForm }) }}
-              className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300">ยกเลิก</button>
-          )}
-        </div>
-      </form>
+      {/* Brought Forward */}
+      <BroughtForwardBar
+        date={obDate ? format(new Date(obDate), 'd MMM yyyy', { locale: th }) : '-'}
+        items={[
+          { label: 'เงินสดยกมา', value: `${fmt(openingBalance)} ฿`, color: 'positive' },
+          { label: 'รายรับสะสม', value: `+${fmt(totalIn)} ฿`, color: 'positive' },
+          { label: 'รายจ่ายสะสม', value: `-${fmt(totalOut)} ฿`, color: 'negative' },
+        ]}
+      />
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <KPICard label="รายรับรวม" value={`${fmt(totalIn)} ฿`} variant="income" />
+        <KPICard label="รายจ่ายรวม" value={`${fmt(totalOut)} ฿`} variant="expense" />
+        <KPICard label="ยอดคงเหลือ" value={`${fmt(currentBalance)} ฿`} variant="balance" valueColor={currentBalance >= 0 ? 'text-sky-400' : 'text-rose-400'} />
+      </div>
+
+      {/* Action Bar */}
+      <div className="flex items-center justify-between">
+        <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormOpen(true) }}
+          className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold transition-all hover:shadow-lg hover:shadow-sky-500/30">
+          + เพิ่มรายการ
+        </button>
+      </div>
+
+      {/* Data Table */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">วันที่</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">ประเภท</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">หมวดหมู่</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">รายละเอียด</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">จำนวน (฿)</th>
-                <th className="px-4 py-3 text-center font-medium text-gray-600">จัดการ</th>
+            <thead>
+              <tr className="bg-slate-700/50">
+                {['วันที่', 'ประเภท', 'หมวดหมู่', 'รายละเอียด', 'จำนวน (฿)', 'จัดการ'].map((h, i) => (
+                  <th key={h} className={`px-4 py-2.5 text-[0.7rem] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${i === 4 ? 'text-right' : 'text-left'}`}>{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">กำลังโหลด...</td></tr>
+                <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">กำลังโหลด...</td></tr>
               ) : entries.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">ยังไม่มีรายการ</td></tr>
-              ) : entries.map(entry => (
-                <tr key={entry.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">{entry.date}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      entry.type === 'in' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}>
+                <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-500">ยังไม่มีรายการ — เริ่มบันทึกรายรับรายจ่ายวันนี้</td></tr>
+              ) : entries.map((entry, i) => (
+                <tr key={entry.id} className={`border-b border-slate-700/30 hover:bg-sky-500/5 transition-colors ${i % 2 === 1 ? 'bg-slate-800/30' : ''}`}>
+                  <td className="px-4 py-2.5 text-slate-300">{entry.date}</td>
+                  <td className="px-4 py-2.5">
+                    <StatusBadge variant={entry.type === 'in' ? 'success' : 'danger'}>
                       {entry.type === 'in' ? 'เงินเข้า' : 'เงินออก'}
-                    </span>
+                    </StatusBadge>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{entry.category}</td>
-                  <td className="px-4 py-3 text-gray-600">{entry.description}</td>
-                  <td className={`px-4 py-3 text-right font-medium ${entry.type === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-                    {entry.type === 'in' ? '+' : '-'}{Number(entry.amount).toLocaleString('th-TH')}
+                  <td className="px-4 py-2.5 text-slate-400">{entry.category}</td>
+                  <td className="px-4 py-2.5 text-slate-300">{entry.description}</td>
+                  <td className={`px-4 py-2.5 text-right font-mono font-medium ${entry.type === 'in' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {entry.type === 'in' ? '+' : '-'}{fmt(Number(entry.amount))}
                   </td>
-                  <td className="px-4 py-3 text-center">
-                    <button onClick={() => handleEdit(entry)} className="text-indigo-600 hover:text-indigo-800 mr-2">แก้ไข</button>
-                    <button onClick={() => handleDelete(entry.id!)} className="text-red-500 hover:text-red-700">ลบ</button>
+                  <td className="px-4 py-2.5">
+                    <div className="flex gap-1">
+                      <button onClick={() => handleEdit(entry)} className="w-7 h-7 rounded-md border border-slate-700 flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-white text-xs transition-colors">✏️</button>
+                      <button onClick={() => handleDelete(entry.id!)} className="w-7 h-7 rounded-md border border-slate-700 flex items-center justify-center text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-400 text-xs transition-colors">🗑️</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -226,6 +131,51 @@ export default function CashFlowPage() {
           </table>
         </div>
       </div>
+
+      {/* Slide-out Form */}
+      <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null); setForm({ ...emptyForm }) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มรายการใหม่'} onSubmit={handleSubmit} submitLabel={editId ? 'บันทึกการแก้ไข' : 'บันทึกรายการ'}>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="วันที่">
+            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required />
+          </FormField>
+          <FormField label="ประเภท">
+            <select value={form.type} onChange={e => { setForm({ ...form, type: e.target.value as 'in' | 'out', category: '' }); setShowAddCat(false) }} className={selectClass}>
+              <option value="in">เงินเข้า</option>
+              <option value="out">เงินออก</option>
+            </select>
+          </FormField>
+        </div>
+        <FormField label="จำนวนเงิน (฿)">
+          <input type="number" min="0.01" step="0.01" value={form.amount || ''} placeholder="0.00" onChange={e => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required />
+        </FormField>
+        <FormField label="หมวดหมู่">
+          {!showAddCat ? (
+            <div className="flex gap-2">
+              <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={`${selectClass} flex-1`}>
+                <option value="">เลือกหมวดหมู่...</option>
+                {currentCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button type="button" onClick={() => setShowAddCat(true)} className="px-3 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm hover:bg-slate-600 whitespace-nowrap">+ เพิ่ม</button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <input type="text" value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="ชื่อหมวดใหม่..." className={`${inputClass} flex-1`} autoFocus />
+              <button type="button" onClick={handleAddCat} className="px-3 py-2 rounded-lg bg-sky-500 text-white text-sm">เพิ่ม</button>
+              <button type="button" onClick={() => { setShowAddCat(false); setNewCategory('') }} className="px-3 py-2 rounded-lg bg-slate-700 text-slate-300 text-sm">ยกเลิก</button>
+            </div>
+          )}
+        </FormField>
+        <FormField label="รายละเอียด">
+          <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="อธิบายรายการ..." className={inputClass} />
+        </FormField>
+        <div className="mt-4 p-4 bg-sky-500/[0.08] rounded-lg border border-sky-500/20">
+          <p className="text-xs text-sky-400 font-semibold mb-2">💡 Tips</p>
+          <p className="text-[0.7rem] text-slate-400 leading-relaxed">
+            เลือกหมวดหมู่ให้ตรงกับประเภทรายจ่าย เพื่อการวิเคราะห์ที่แม่นยำ<br />
+            รายละเอียดช่วยให้ค้นหาย้อนหลังได้ง่าย
+          </p>
+        </div>
+      </SlideOutForm>
     </div>
   )
 }

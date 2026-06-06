@@ -4,24 +4,23 @@ import type { CashFlow, Loan, Receivable, InventoryEntry } from '../types'
 import { exportToExcel } from '../lib/export'
 import { format, addMonths, startOfMonth, differenceInMonths, parseISO } from 'date-fns'
 import { th } from 'date-fns/locale'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts'
+import KPICard from './shared/KPICard'
+import BroughtForwardBar from './shared/BroughtForwardBar'
 import TimeRangeSelector from './TimeRangeSelector'
 import type { TimeRange } from './TimeRangeSelector'
+import StatusBadge from './shared/StatusBadge'
 
-interface OpeningBalances {
-  cash_flow: number
-  loans: number
-  receivables: number
-  inventory: number
-}
+interface OpeningBalances { cash_flow: number; loans: number; receivables: number; inventory: number }
 
-export default function Dashboard() {
+const COLORS = ['#fb7185', '#fbbf24', '#38bdf8', '#a78bfa', '#64748b']
+
+export default function Dashboard({ exportTrigger }: { exportTrigger: number }) {
   const [cashFlow, setCashFlow] = useState<CashFlow[]>([])
   const [loans, setLoans] = useState<Loan[]>([])
   const [receivables, setReceivables] = useState<Receivable[]>([])
   const [inventory, setInventory] = useState<InventoryEntry[]>([])
-  const [openingBalances, setOpeningBalances] = useState<OpeningBalances>({
-    cash_flow: 0, loans: 0, receivables: 0, inventory: 0,
-  })
+  const [ob, setOb] = useState<OpeningBalances>({ cash_flow: 0, loans: 0, receivables: 0, inventory: 0 })
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState<TimeRange>({ label: '6 เดือน', months: 6 })
 
@@ -32,385 +31,312 @@ export default function Dashboard() {
       supabase.from('sinchai_receivables').select('*').order('due_date'),
       supabase.from('sinchai_inventory').select('*').order('date'),
       supabase.from('sinchai_opening_balances').select('*'),
-    ]).then(([cf, ln, rc, inv, ob]) => {
+    ]).then(([cf, ln, rc, inv, obd]) => {
       setCashFlow(cf.data || [])
       setLoans(ln.data || [])
       setReceivables(rc.data || [])
       setInventory(inv.data || [])
-      const balances: OpeningBalances = { cash_flow: 0, loans: 0, receivables: 0, inventory: 0 }
-      for (const row of (ob.data || [])) {
-        balances[row.module as keyof OpeningBalances] = Number(row.amount)
-      }
-      setOpeningBalances(balances)
+      const b: OpeningBalances = { cash_flow: 0, loans: 0, receivables: 0, inventory: 0 }
+      for (const r of (obd.data || [])) b[r.module as keyof OpeningBalances] = Number(r.amount)
+      setOb(b)
       setLoading(false)
     })
   }, [])
 
-  // Generate month list based on time range
   const monthList = useMemo(() => {
     const now = new Date()
-    if (timeRange.months > 0) {
-      return Array.from({ length: timeRange.months }, (_, i) => startOfMonth(addMonths(now, i)))
-    }
+    if (timeRange.months > 0) return Array.from({ length: timeRange.months }, (_, i) => startOfMonth(addMonths(now, i)))
     if (timeRange.startDate && timeRange.endDate) {
-      const start = startOfMonth(parseISO(timeRange.startDate))
-      const end = startOfMonth(parseISO(timeRange.endDate))
-      const count = Math.max(1, differenceInMonths(end, start) + 1)
-      return Array.from({ length: Math.min(count, 24) }, (_, i) => startOfMonth(addMonths(start, i)))
+      const s = startOfMonth(parseISO(timeRange.startDate)), e = startOfMonth(parseISO(timeRange.endDate))
+      const c = Math.max(1, Math.min(24, differenceInMonths(e, s) + 1))
+      return Array.from({ length: c }, (_, i) => startOfMonth(addMonths(s, i)))
     }
     return Array.from({ length: 6 }, (_, i) => startOfMonth(addMonths(now, i)))
   }, [timeRange])
 
-  // Stock value calculation
   const stockByItem = useMemo(() => {
-    const summary: Record<string, { qty: number; value: number }> = {}
-    const sorted = [...inventory].sort((a, b) => a.date.localeCompare(b.date))
-    for (const e of sorted) {
-      if (!summary[e.item]) summary[e.item] = { qty: 0, value: 0 }
-      if (e.type === 'in') {
-        summary[e.item].qty += Number(e.quantity)
-        summary[e.item].value += Number(e.quantity) * Number(e.unit_price)
-      } else {
-        summary[e.item].qty -= Number(e.quantity)
-        summary[e.item].value -= Number(e.quantity) * Number(e.unit_price)
-      }
+    const s: Record<string, { qty: number; value: number }> = {}
+    for (const e of [...inventory].sort((a, b) => a.date.localeCompare(b.date))) {
+      if (!s[e.item]) s[e.item] = { qty: 0, value: 0 }
+      const v = Number(e.quantity) * Number(e.unit_price)
+      if (e.type === 'in') { s[e.item].qty += Number(e.quantity); s[e.item].value += v }
+      else { s[e.item].qty -= Number(e.quantity); s[e.item].value -= v }
     }
-    return summary
+    return s
   }, [inventory])
 
-  // Monthly projections with running balances
   const projections = useMemo(() => {
-    let runningCash = openingBalances.cash_flow
-    let runningLoanDebt = openingBalances.loans
-    let runningReceivable = openingBalances.receivables
-    let runningStock = openingBalances.inventory
-
-    // Add current totals from transactions
-    const totalStockValue = Object.values(stockByItem).reduce((s, v) => s + Math.max(0, v.value), 0)
-    const currentReceivablePending = receivables.filter(r => r.status !== 'received').reduce((s, r) => s + Number(r.amount), 0)
+    let rc = ob.cash_flow, rl = ob.loans, rr = ob.receivables, rs = ob.inventory
+    const tsv = Object.values(stockByItem).reduce((s, v) => s + Math.max(0, v.value), 0)
+    const crp = receivables.filter(r => r.status !== 'received').reduce((s, r) => s + Number(r.amount), 0)
 
     return monthList.map((month, idx) => {
-      const monthStr = format(month, 'yyyy-MM')
-      const label = format(month, 'MMM yyyy', { locale: th })
+      const ms = format(month, 'yyyy-MM'), label = format(month, 'MMM yy', { locale: th })
+      const cfIn = cashFlow.filter(e => e.type === 'in' && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.amount), 0)
+      const cfOut = cashFlow.filter(e => e.type === 'out' && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.amount), 0)
+      const lp = loans.filter(l => l.due_date.startsWith(ms)).reduce((s, l) => s + Number(l.principal), 0)
+      const li = loans.filter(l => l.due_date.startsWith(ms)).reduce((s, l) => s + Number(l.interest), 0)
+      const lt = lp + li
+      const re = receivables.filter(r => r.status !== 'received' && (r.expected_date || r.due_date).startsWith(ms)).reduce((s, r) => s + Number(r.amount), 0)
+      const invIn = inventory.filter(e => e.type === 'in' && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.quantity) * Number(e.unit_price), 0)
+      const invOut = inventory.filter(e => e.type === 'out' && e.date.startsWith(ms)).reduce((s, e) => s + Number(e.quantity) * Number(e.unit_price), 0)
 
-      // Cash flow for this month
-      const cfIn = cashFlow.filter(e => e.type === 'in' && e.date.startsWith(monthStr)).reduce((s, e) => s + Number(e.amount), 0)
-      const cfOut = cashFlow.filter(e => e.type === 'out' && e.date.startsWith(monthStr)).reduce((s, e) => s + Number(e.amount), 0)
-
-      // Loans due this month
-      const loanPayments = loans.filter(l => l.due_date.startsWith(monthStr))
-      const loanPrincipal = loanPayments.reduce((s, l) => s + Number(l.principal), 0)
-      const loanInterest = loanPayments.reduce((s, l) => s + Number(l.interest), 0)
-      const loanTotal = loanPrincipal + loanInterest
-
-      // Receivables expected this month
-      const recExpected = receivables.filter(r => r.status !== 'received' && (r.expected_date || r.due_date).startsWith(monthStr))
-        .reduce((s, r) => s + Number(r.amount), 0)
-
-      // Inventory movements this month
-      const invIn = inventory.filter(e => e.type === 'in' && e.date.startsWith(monthStr))
-        .reduce((s, e) => s + Number(e.quantity) * Number(e.unit_price), 0)
-      const invOut = inventory.filter(e => e.type === 'out' && e.date.startsWith(monthStr))
-        .reduce((s, e) => s + Number(e.quantity) * Number(e.unit_price), 0)
-
-      // Running balances
       if (idx === 0) {
-        // First month: add existing transaction totals
-        const existingCfIn = cashFlow.filter(e => e.type === 'in').reduce((s, e) => s + Number(e.amount), 0)
-        const existingCfOut = cashFlow.filter(e => e.type === 'out').reduce((s, e) => s + Number(e.amount), 0)
-        runningCash += existingCfIn - existingCfOut
-        runningLoanDebt += loans.filter(l => l.status !== 'paid').reduce((s, l) => s + Number(l.principal), 0)
-        runningReceivable += currentReceivablePending
-        runningStock += totalStockValue
-      } else {
-        runningCash += cfIn + recExpected - cfOut - loanTotal
-        runningLoanDebt -= loanPrincipal
-        runningReceivable -= recExpected
-        runningStock += invIn - invOut
-      }
+        rc += cashFlow.filter(e => e.type === 'in').reduce((s, e) => s + Number(e.amount), 0) - cashFlow.filter(e => e.type === 'out').reduce((s, e) => s + Number(e.amount), 0)
+        rl += loans.filter(l => l.status !== 'paid').reduce((s, l) => s + Number(l.principal), 0)
+        rr += crp; rs += tsv
+      } else { rc += cfIn + re - cfOut - lt; rl -= lp; rr -= re; rs += invIn - invOut }
 
-      return {
-        month: monthStr,
-        label,
-        cfIn,
-        cfOut,
-        loanPrincipal,
-        loanInterest,
-        loanTotal,
-        recExpected,
-        invIn,
-        invOut,
-        netCash: cfIn + recExpected - cfOut - loanTotal,
-        endingCash: runningCash,
-        endingLoanDebt: Math.max(0, runningLoanDebt),
-        endingReceivable: Math.max(0, runningReceivable),
-        endingStock: Math.max(0, runningStock),
-      }
+      return { month: ms, label, cfIn, cfOut, lp, li, lt, re, invIn, invOut, net: cfIn + re - cfOut - lt, cash: rc, debt: Math.max(0, rl), recv: Math.max(0, rr), stock: Math.max(0, rs) }
     })
-  }, [monthList, cashFlow, loans, receivables, inventory, stockByItem, openingBalances])
+  }, [monthList, cashFlow, loans, receivables, inventory, stockByItem, ob])
 
-  if (loading) {
-    return <div className="text-center py-12 text-gray-400">กำลังโหลดข้อมูล...</div>
-  }
+  // Export handler
+  useEffect(() => {
+    if (exportTrigger === 0) return
+    exportToExcel([
+      { name: 'กระแสเงินสด', data: cashFlow.map(e => ({ 'วันที่': e.date, 'ประเภท': e.type === 'in' ? 'เงินเข้า' : 'เงินออก', 'จำนวน': Number(e.amount), 'หมวดหมู่': e.category, 'รายละเอียด': e.description })) },
+      { name: 'เงินกู้', data: loans.map(l => ({ 'วันครบกำหนด': l.due_date, 'เงินต้น': Number(l.principal), 'ดอกเบี้ย': Number(l.interest), 'ยอดรวม': Number(l.total), 'สถานะ': l.status, 'รายละเอียด': l.description })) },
+      { name: 'ลูกหนี้', data: receivables.map(r => ({ 'ชื่อลูกหนี้': r.debtor_name, 'จำนวน': Number(r.amount), 'วันครบกำหนด': r.due_date, 'สถานะ': r.status, 'คาดว่าจะได้รับ': r.expected_date || '-', 'หมายเหตุ': r.notes })) },
+      { name: 'สต๊อก', data: inventory.map(e => ({ 'วันที่': e.date, 'ประเภท': e.type === 'in' ? 'สั่งเข้า' : 'ขายออก', 'สินค้า': e.item, 'จำนวน': Number(e.quantity), 'ราคา/หน่วย': Number(e.unit_price), 'มูลค่า': Number(e.quantity) * Number(e.unit_price) })) },
+      { name: 'ประมาณการรายเดือน', data: projections.map(m => ({ 'เดือน': m.label, 'รายรับ': m.cfIn, 'รายจ่าย': m.cfOut, 'ผ่อนชำระ': m.lt, 'ลูกหนี้คาดรับ': m.re, 'สุทธิ': m.net, 'เงินสดคงเหลือ': m.cash, 'หนี้คงค้าง': m.debt, 'ลูกหนี้คงค้าง': m.recv, 'มูลค่าสต๊อก': m.stock })) },
+    ], `sinchai-financial-report-${format(new Date(), 'yyyy-MM-dd')}`)
+  }, [exportTrigger])
 
-  // Current totals
+  if (loading) return <div className="text-center py-20 text-slate-500">กำลังโหลดข้อมูล...</div>
+
   const totalIn = cashFlow.reduce((s, e) => s + (e.type === 'in' ? Number(e.amount) : 0), 0)
   const totalOut = cashFlow.reduce((s, e) => s + (e.type === 'out' ? Number(e.amount) : 0), 0)
-  const currentCash = openingBalances.cash_flow + totalIn - totalOut
+  const currentCash = ob.cash_flow + totalIn - totalOut
   const pendingLoans = loans.filter(l => l.status !== 'paid')
-  const totalLoanDebt = openingBalances.loans + pendingLoans.reduce((s, l) => s + Number(l.principal), 0)
-  const pendingReceivables = receivables.filter(r => r.status !== 'received')
-  const totalReceivable = openingBalances.receivables + pendingReceivables.reduce((s, r) => s + Number(r.amount), 0)
-  const totalStockValue = openingBalances.inventory + Object.values(stockByItem).reduce((s, v) => s + Math.max(0, v.value), 0)
+  const totalDebt = ob.loans + pendingLoans.reduce((s, l) => s + Number(l.principal), 0)
+  const pendingRecv = receivables.filter(r => r.status !== 'received')
+  const totalRecv = ob.receivables + pendingRecv.reduce((s, r) => s + Number(r.amount), 0)
+  const totalStock = ob.inventory + Object.values(stockByItem).reduce((s, v) => s + Math.max(0, v.value), 0)
+  const fmt = (n: number) => n.toLocaleString('th-TH')
 
-  const handleExport = () => {
-    exportToExcel([
-      {
-        name: 'กระแสเงินสด',
-        data: cashFlow.map(e => ({
-          'วันที่': e.date,
-          'ประเภท': e.type === 'in' ? 'เงินเข้า' : 'เงินออก',
-          'จำนวน': Number(e.amount),
-          'หมวดหมู่': e.category,
-          'รายละเอียด': e.description,
-        })),
-      },
-      {
-        name: 'เงินกู้',
-        data: loans.map(l => ({
-          'วันครบกำหนด': l.due_date,
-          'เงินต้น': Number(l.principal),
-          'ดอกเบี้ย': Number(l.interest),
-          'ยอดรวม': Number(l.total),
-          'สถานะ': l.status,
-          'รายละเอียด': l.description,
-        })),
-      },
-      {
-        name: 'ลูกหนี้',
-        data: receivables.map(r => ({
-          'ชื่อลูกหนี้': r.debtor_name,
-          'จำนวน': Number(r.amount),
-          'วันครบกำหนด': r.due_date,
-          'สถานะ': r.status,
-          'คาดว่าจะได้รับ': r.expected_date || '-',
-          'หมายเหตุ': r.notes,
-        })),
-      },
-      {
-        name: 'สต๊อก',
-        data: inventory.map(e => ({
-          'วันที่': e.date,
-          'ประเภท': e.type === 'in' ? 'สั่งเข้า' : 'ขายออก',
-          'สินค้า': e.item,
-          'จำนวน': Number(e.quantity),
-          'ราคา/หน่วย': Number(e.unit_price),
-          'มูลค่า': Number(e.quantity) * Number(e.unit_price),
-        })),
-      },
-      {
-        name: 'ประมาณการรายเดือน',
-        data: projections.map(m => ({
-          'เดือน': m.label,
-          'รายรับ': m.cfIn,
-          'รายจ่าย': m.cfOut,
-          'ผ่อนเงินต้น': m.loanPrincipal,
-          'ดอกเบี้ย': m.loanInterest,
-          'ลูกหนี้คาดรับ': m.recExpected,
-          'สุทธิ': m.netCash,
-          'เงินสดคงเหลือ': m.endingCash,
-          'หนี้คงค้าง': m.endingLoanDebt,
-          'ลูกหนี้คงค้าง': m.endingReceivable,
-          'มูลค่าสต๊อก': m.endingStock,
-        })),
-      },
-    ], `sinchai-financial-report-${format(new Date(), 'yyyy-MM-dd')}`)
-  }
+  // Expense breakdown for donut
+  const expenseByCategory: Record<string, number> = {}
+  cashFlow.filter(e => e.type === 'out').forEach(e => { expenseByCategory[e.category] = (expenseByCategory[e.category] || 0) + Number(e.amount) })
+  const donutData = Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({ name, value }))
+
+  // Receivables aging
+  const now = new Date()
+  const aging = [
+    { label: '0-30 วัน', value: 0, color: '#34d399' },
+    { label: '30-60 วัน', value: 0, color: '#38bdf8' },
+    { label: '60-90 วัน', value: 0, color: '#fbbf24' },
+    { label: '90+ วัน', value: 0, color: '#fb7185' },
+  ]
+  pendingRecv.forEach(r => {
+    const days = Math.floor((now.getTime() - new Date(r.due_date).getTime()) / 86400000)
+    const amt = Number(r.amount)
+    if (days < 30) aging[0].value += amt
+    else if (days < 60) aging[1].value += amt
+    else if (days < 90) aging[2].value += amt
+    else aging[3].value += amt
+  })
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap justify-between items-center gap-4">
-        <h2 className="text-xl font-bold text-gray-800">แดชบอร์ดวางแผนการเงิน</h2>
-        <button onClick={handleExport}
-          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
-          ดาวน์โหลด Excel
-        </button>
+      <div className="flex flex-wrap justify-between items-start gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">แดชบอร์ดวางแผนการเงิน</h1>
+          <p className="text-xs text-slate-400 mt-1">ภาพรวมและประมาณการทุกหมวด — อัปเดตล่าสุด {format(now, 'd MMM yyyy', { locale: th })}</p>
+        </div>
+        <TimeRangeSelector onChange={setTimeRange} />
       </div>
 
-      {/* Time Range */}
-      <TimeRangeSelector onChange={setTimeRange} />
+      {/* Brought Forward */}
+      <BroughtForwardBar
+        date={format(now, '1 MMM yyyy', { locale: th })}
+        items={[
+          { label: 'เงินสดคงเหลือ', value: `${fmt(ob.cash_flow)} ฿`, color: 'positive' },
+          { label: 'หนี้คงค้าง', value: `-${fmt(ob.loans)} ฿`, color: 'negative' },
+          { label: 'ลูกหนี้คงค้าง', value: `${fmt(ob.receivables)} ฿` },
+          { label: 'มูลค่าสต๊อก', value: `${fmt(ob.inventory)} ฿` },
+        ]}
+      />
 
-      {/* Current Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className={`rounded-xl p-4 border ${currentCash >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-          <p className="text-sm font-medium text-gray-600">เงินสดคงเหลือ</p>
-          <p className={`text-2xl font-bold ${currentCash >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-            {currentCash.toLocaleString('th-TH')} ฿
-          </p>
-          <p className="text-xs text-gray-500 mt-1">ยกมา {openingBalances.cash_flow.toLocaleString('th-TH')}</p>
-        </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-gray-600">หนี้คงค้าง</p>
-          <p className="text-2xl font-bold text-orange-700">{totalLoanDebt.toLocaleString('th-TH')} ฿</p>
-          <p className="text-xs text-gray-500 mt-1">{pendingLoans.length} รายการ</p>
-        </div>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-gray-600">ลูกหนี้คงค้าง</p>
-          <p className="text-2xl font-bold text-yellow-700">{totalReceivable.toLocaleString('th-TH')} ฿</p>
-          <p className="text-xs text-gray-500 mt-1">{pendingReceivables.length} ราย</p>
-        </div>
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-gray-600">มูลค่าสต๊อก</p>
-          <p className="text-2xl font-bold text-indigo-700">{totalStockValue.toLocaleString('th-TH')} ฿</p>
-          <p className="text-xs text-gray-500 mt-1">{Object.keys(stockByItem).length} รายการ</p>
-        </div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard label="เงินสดคงเหลือ" value={fmt(currentCash)} variant="income" valueColor={currentCash >= 0 ? undefined : 'text-rose-400'} />
+        <KPICard label="หนี้คงค้าง" value={fmt(totalDebt)} variant="expense" trend={`${pendingLoans.length} รายการ`} trendDirection="down" />
+        <KPICard label="ลูกหนี้คงค้าง" value={fmt(totalRecv)} variant="debt" trend={`${pendingRecv.length} ราย`} trendDirection="down" />
+        <KPICard label="มูลค่าสต๊อก" value={fmt(totalStock)} variant="stock" />
       </div>
 
-      {/* Projection Table — Cash Flow */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="px-6 py-4 border-b bg-gray-50">
-          <h3 className="font-semibold text-gray-800">ประมาณการกระแสเงินสด — {timeRange.label}</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-3 py-3 text-left font-medium text-gray-600">เดือน</th>
-                <th className="px-3 py-3 text-right font-medium text-green-600">รายรับ</th>
-                <th className="px-3 py-3 text-right font-medium text-red-600">รายจ่าย</th>
-                <th className="px-3 py-3 text-right font-medium text-orange-600">ผ่อนชำระ</th>
-                <th className="px-3 py-3 text-right font-medium text-yellow-600">ลูกหนี้คาดรับ</th>
-                <th className="px-3 py-3 text-right font-medium text-gray-700">สุทธิ</th>
-                <th className="px-3 py-3 text-right font-medium text-blue-700">เงินสดคงเหลือ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {projections.map(m => (
-                <tr key={m.month} className="hover:bg-gray-50">
-                  <td className="px-3 py-3 font-medium">{m.label}</td>
-                  <td className="px-3 py-3 text-right text-green-600">{m.cfIn > 0 ? `+${m.cfIn.toLocaleString('th-TH')}` : '-'}</td>
-                  <td className="px-3 py-3 text-right text-red-600">{m.cfOut > 0 ? `-${m.cfOut.toLocaleString('th-TH')}` : '-'}</td>
-                  <td className="px-3 py-3 text-right text-orange-600">{m.loanTotal > 0 ? `-${m.loanTotal.toLocaleString('th-TH')}` : '-'}</td>
-                  <td className="px-3 py-3 text-right text-yellow-600">{m.recExpected > 0 ? `+${m.recExpected.toLocaleString('th-TH')}` : '-'}</td>
-                  <td className={`px-3 py-3 text-right font-bold ${m.netCash >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    {m.netCash.toLocaleString('th-TH')}
-                  </td>
-                  <td className={`px-3 py-3 text-right font-bold ${m.endingCash >= 0 ? 'text-blue-700' : 'text-red-700'}`}>
-                    {m.endingCash.toLocaleString('th-TH')}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Projection Table — Loan & Receivables & Stock */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-        <div className="px-6 py-4 border-b bg-gray-50">
-          <h3 className="font-semibold text-gray-800">ประมาณการหนี้สิน ลูกหนี้ และสต๊อก — {timeRange.label}</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-3 py-3 text-left font-medium text-gray-600">เดือน</th>
-                <th className="px-3 py-3 text-right font-medium text-orange-600">ผ่อนเงินต้น</th>
-                <th className="px-3 py-3 text-right font-medium text-purple-600">ดอกเบี้ย</th>
-                <th className="px-3 py-3 text-right font-medium text-orange-700">หนี้คงค้าง</th>
-                <th className="px-3 py-3 text-right font-medium text-yellow-600">ลูกหนี้คาดรับ</th>
-                <th className="px-3 py-3 text-right font-medium text-yellow-700">ลูกหนี้คงค้าง</th>
-                <th className="px-3 py-3 text-right font-medium text-green-600">สต๊อกเข้า</th>
-                <th className="px-3 py-3 text-right font-medium text-red-600">สต๊อกออก</th>
-                <th className="px-3 py-3 text-right font-medium text-indigo-700">มูลค่าสต๊อก</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {projections.map(m => (
-                <tr key={m.month} className="hover:bg-gray-50">
-                  <td className="px-3 py-3 font-medium">{m.label}</td>
-                  <td className="px-3 py-3 text-right text-orange-600">{m.loanPrincipal > 0 ? m.loanPrincipal.toLocaleString('th-TH') : '-'}</td>
-                  <td className="px-3 py-3 text-right text-purple-600">{m.loanInterest > 0 ? m.loanInterest.toLocaleString('th-TH') : '-'}</td>
-                  <td className="px-3 py-3 text-right font-medium text-orange-700">{m.endingLoanDebt.toLocaleString('th-TH')}</td>
-                  <td className="px-3 py-3 text-right text-yellow-600">{m.recExpected > 0 ? m.recExpected.toLocaleString('th-TH') : '-'}</td>
-                  <td className="px-3 py-3 text-right font-medium text-yellow-700">{m.endingReceivable.toLocaleString('th-TH')}</td>
-                  <td className="px-3 py-3 text-right text-green-600">{m.invIn > 0 ? `+${m.invIn.toLocaleString('th-TH')}` : '-'}</td>
-                  <td className="px-3 py-3 text-right text-red-600">{m.invOut > 0 ? `-${m.invOut.toLocaleString('th-TH')}` : '-'}</td>
-                  <td className="px-3 py-3 text-right font-bold text-indigo-700">{m.endingStock.toLocaleString('th-TH')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Overdue Alerts */}
-      {(loans.filter(l => l.status === 'overdue').length > 0 || receivables.filter(r => r.status === 'overdue').length > 0) && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-          <h3 className="font-semibold text-red-800 mb-3">รายการเลยกำหนด</h3>
-          <div className="space-y-2">
-            {loans.filter(l => l.status === 'overdue').map(l => (
-              <div key={l.id} className="flex justify-between text-sm">
-                <span className="text-red-700">เงินกู้: {l.description || 'ไม่มีรายละเอียด'} — ครบกำหนด {l.due_date}</span>
-                <span className="font-medium text-red-800">{(Number(l.principal) + Number(l.interest)).toLocaleString('th-TH')} ฿</span>
-              </div>
-            ))}
-            {receivables.filter(r => r.status === 'overdue').map(r => (
-              <div key={r.id} className="flex justify-between text-sm">
-                <span className="text-red-700">ลูกหนี้: {r.debtor_name} — ครบกำหนด {r.due_date}</span>
-                <span className="font-medium text-red-800">{Number(r.amount).toLocaleString('th-TH')} ฿</span>
+      {/* Cash Flow Projection Chart */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-white">ประมาณการกระแสเงินสด — {timeRange.label}</h2>
+          <div className="flex gap-4">
+            {[{ label: 'รายรับ', color: '#34d399' }, { label: 'รายจ่าย', color: '#fb7185' }, { label: 'ผ่อนชำระ', color: '#a78bfa' }, { label: 'สุทธิ', color: '#ffffff' }].map(l => (
+              <div key={l.label} className="flex items-center gap-1.5 text-[0.7rem] text-slate-400">
+                <div className="w-2 h-2 rounded-full" style={{ background: l.color }} />
+                {l.label}
               </div>
             ))}
           </div>
         </div>
-      )}
+        <ResponsiveContainer width="100%" height={240}>
+          <AreaChart data={projections}>
+            <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
+            <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#334155' }} />
+            <YAxis tick={{ fill: '#64748b', fontSize: 11 }} axisLine={{ stroke: '#334155' }} tickFormatter={v => `${(v / 1000).toFixed(0)}K`} />
+            <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} formatter={(v) => `${fmt(Number(v))} ฿`} />
+            <Area type="monotone" dataKey="cfIn" name="รายรับ" stroke="#34d399" fill="rgba(16,185,129,0.15)" strokeWidth={2} />
+            <Area type="monotone" dataKey="cfOut" name="รายจ่าย" stroke="#fb7185" fill="rgba(244,63,94,0.1)" strokeWidth={2} />
+            <Area type="monotone" dataKey="lt" name="ผ่อนชำระ" stroke="#a78bfa" fill="none" strokeWidth={1.5} strokeDasharray="4 4" />
+            <Area type="monotone" dataKey="net" name="สุทธิ" stroke="#ffffff" fill="none" strokeWidth={2} strokeDasharray="6 3" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <h3 className="font-semibold text-gray-800 mb-3">หมวดรายจ่ายสูงสุด</h3>
-          {(() => {
-            const byCategory: Record<string, number> = {}
-            cashFlow.filter(e => e.type === 'out').forEach(e => {
-              byCategory[e.category] = (byCategory[e.category] || 0) + Number(e.amount)
-            })
-            const sorted = Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 5)
-            if (sorted.length === 0) return <p className="text-gray-400 text-sm">ยังไม่มีข้อมูล</p>
-            const max = sorted[0][1]
-            return sorted.map(([cat, amount]) => (
-              <div key={cat} className="mb-3">
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-700">{cat}</span>
-                  <span className="font-medium">{amount.toLocaleString('th-TH')} ฿</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div className="bg-red-400 rounded-full h-2" style={{ width: `${(amount / max) * 100}%` }} />
-                </div>
+      {/* Two Column: Donut + Upcoming */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Expense Donut */}
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+          <h2 className="text-base font-semibold text-white mb-4">หมวดรายจ่ายสูงสุด</h2>
+          {donutData.length === 0 ? (
+            <p className="text-slate-500 text-sm py-8 text-center">ยังไม่มีข้อมูล</p>
+          ) : (
+            <div className="flex items-center gap-6">
+              <div className="w-40 h-40 flex-shrink-0">
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={donutData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={2} dataKey="value">
+                      {donutData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-            ))
-          })()}
+              <div className="space-y-2">
+                {donutData.map((d, i) => (
+                  <div key={d.name} className="flex items-center gap-2 text-sm">
+                    <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: COLORS[i] }} />
+                    <span className="text-slate-300 flex-1">{d.name}</span>
+                    <span className="text-white font-mono text-xs font-medium">{fmt(d.value)} ฿</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <h3 className="font-semibold text-gray-800 mb-3">การชำระที่ใกล้ถึง</h3>
-          {(() => {
-            const upcoming = pendingLoans
-              .sort((a, b) => a.due_date.localeCompare(b.due_date))
-              .slice(0, 5)
-            if (upcoming.length === 0) return <p className="text-gray-400 text-sm">ไม่มีรายการค้างชำระ</p>
-            return upcoming.map(l => (
-              <div key={l.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{l.description || 'เงินกู้'}</p>
-                  <p className="text-xs text-gray-500">ครบกำหนด: {l.due_date}</p>
+        {/* Upcoming Payments */}
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-white">การชำระที่ใกล้ถึง</h2>
+            {pendingLoans.length > 0 && <StatusBadge variant="warning">{pendingLoans.length} รายการ</StatusBadge>}
+          </div>
+          <div className="space-y-2">
+            {pendingLoans.length === 0 ? (
+              <p className="text-slate-500 text-sm py-4 text-center">ไม่มีรายการค้างชำระ</p>
+            ) : pendingLoans.sort((a, b) => a.due_date.localeCompare(b.due_date)).slice(0, 5).map(l => {
+              const days = Math.floor((new Date(l.due_date).getTime() - now.getTime()) / 86400000)
+              const statusColor = days < 0 ? 'bg-rose-400' : days < 14 ? 'bg-amber-400' : 'bg-emerald-400'
+              return (
+                <div key={l.id} className="flex items-center gap-3 px-3 py-2.5 bg-slate-800/50 rounded-lg border border-slate-700/30">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-200 font-medium truncate">{l.description || 'เงินกู้'}</p>
+                    <p className="text-[0.65rem] text-slate-500">{days < 0 ? `เลยกำหนด ${-days} วัน` : `ครบกำหนด ${l.due_date} (${days} วัน)`}</p>
+                  </div>
+                  <span className={`font-mono text-sm font-semibold ${days < 0 ? 'text-rose-400' : 'text-white'}`}>
+                    -{fmt(Number(l.principal) + Number(l.interest))} ฿
+                  </span>
                 </div>
-                <span className="font-medium text-orange-700">
-                  {(Number(l.principal) + Number(l.interest)).toLocaleString('th-TH')} ฿
-                </span>
-              </div>
-            ))
-          })()}
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Projection Tables */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4">
+          <h2 className="text-base font-semibold text-white">ประมาณการกระแสเงินสด — รายเดือน</h2>
+          <div className="flex gap-2">
+            <StatusBadge variant="success">เงินเข้า</StatusBadge>
+            <StatusBadge variant="danger">เงินออก</StatusBadge>
+            <StatusBadge variant="info">คงเหลือ</StatusBadge>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-700/50">
+                {['เดือน', 'รายรับ', 'รายจ่าย', 'ผ่อนชำระ', 'ลูกหนี้คาดรับ', 'สุทธิ', 'เงินสดคงเหลือ'].map((h, i) => (
+                  <th key={h} className={`px-4 py-2.5 text-[0.7rem] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${i > 0 ? 'text-right' : 'text-left'}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {projections.map((m, i) => (
+                <tr key={m.month} className={`border-b border-slate-700/30 hover:bg-sky-500/5 ${i % 2 === 1 ? 'bg-slate-800/30' : ''}`}>
+                  <td className="px-4 py-2.5 text-slate-300">{m.label}</td>
+                  <td className="px-4 py-2.5 text-right font-mono font-medium text-emerald-400">{m.cfIn > 0 ? `+${fmt(m.cfIn)}` : '-'}</td>
+                  <td className="px-4 py-2.5 text-right font-mono font-medium text-rose-400">{m.cfOut > 0 ? `-${fmt(m.cfOut)}` : '-'}</td>
+                  <td className="px-4 py-2.5 text-right font-mono font-medium text-rose-400">{m.lt > 0 ? `-${fmt(m.lt)}` : '-'}</td>
+                  <td className="px-4 py-2.5 text-right font-mono font-medium text-sky-400">{m.re > 0 ? `+${fmt(m.re)}` : '-'}</td>
+                  <td className={`px-4 py-2.5 text-right font-mono font-bold ${m.net >= 0 ? 'text-white' : 'text-rose-400'}`}>{fmt(m.net)}</td>
+                  <td className={`px-4 py-2.5 text-right font-mono font-bold text-[0.85rem] ${m.cash >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{fmt(m.cash)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Bottom Widgets: Aging + Stock */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Receivables Aging */}
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-white">อายุลูกหนี้คงค้าง</h2>
+            {receivables.filter(r => r.status === 'overdue').length > 0 && (
+              <StatusBadge variant="warning">{receivables.filter(r => r.status === 'overdue').length} รายเลยกำหนด</StatusBadge>
+            )}
+          </div>
+          <ResponsiveContainer width="100%" height={140}>
+            <BarChart data={aging} layout="horizontal">
+              <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis hide />
+              <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }} formatter={(v) => `${fmt(Number(v))} ฿`} />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                {aging.map((a, i) => <Cell key={i} fill={a.color} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Debt/Recv/Stock Projection Table */}
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+          <h2 className="text-base font-semibold text-white mb-4">แนวโน้มหนี้สิน ลูกหนี้ สต๊อก</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-slate-400">
+                  <th className="text-left py-1.5 font-semibold">เดือน</th>
+                  <th className="text-right py-1.5 font-semibold">หนี้คงค้าง</th>
+                  <th className="text-right py-1.5 font-semibold">ลูกหนี้</th>
+                  <th className="text-right py-1.5 font-semibold">สต๊อก</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projections.map((m, i) => (
+                  <tr key={m.month} className={`border-t border-slate-700/20 ${i % 2 === 1 ? 'bg-slate-800/30' : ''}`}>
+                    <td className="py-1.5 text-slate-300">{m.label}</td>
+                    <td className="py-1.5 text-right font-mono text-amber-400">{fmt(m.debt)}</td>
+                    <td className="py-1.5 text-right font-mono text-sky-400">{fmt(m.recv)}</td>
+                    <td className="py-1.5 text-right font-mono text-violet-400">{fmt(m.stock)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -2,126 +2,85 @@ import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import type { InventoryEntry } from '../types'
 import { format } from 'date-fns'
-import OpeningBalance from './OpeningBalance'
+import { th } from 'date-fns/locale'
+import KPICard from './shared/KPICard'
+import BroughtForwardBar from './shared/BroughtForwardBar'
+import StatusBadge from './shared/StatusBadge'
+import SlideOutForm from './shared/SlideOutForm'
+import FormField, { inputClass, selectClass } from './shared/FormField'
 
-const emptyForm: InventoryEntry = {
-  date: format(new Date(), 'yyyy-MM-dd'),
-  type: 'in',
-  item: '',
-  quantity: 0,
-  unit_price: 0,
-}
+const emptyForm: InventoryEntry = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', item: '', quantity: 0, unit_price: 0 }
 
 export default function InventoryPage() {
   const [entries, setEntries] = useState<InventoryEntry[]>([])
   const [form, setForm] = useState<InventoryEntry>({ ...emptyForm })
   const [loading, setLoading] = useState(true)
   const [editId, setEditId] = useState<number | null>(null)
+  const [formOpen, setFormOpen] = useState(false)
   const [openingBalance, setOpeningBalance] = useState(0)
+  const [obDate, setObDate] = useState('')
 
-  const fetchEntries = async () => {
-    const { data } = await supabase
-      .from('sinchai_inventory')
-      .select('*')
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(200)
+  const fetchAll = async () => {
+    const [{ data }, { data: ob }] = await Promise.all([
+      supabase.from('sinchai_inventory').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(200),
+      supabase.from('sinchai_opening_balances').select('*').eq('module', 'inventory').single(),
+    ])
     setEntries(data || [])
+    if (ob) { setOpeningBalance(Number(ob.amount)); setObDate(ob.as_of_date) }
     setLoading(false)
   }
-
-  useEffect(() => { fetchEntries() }, [])
+  useEffect(() => { fetchAll() }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = {
-      date: form.date,
-      type: form.type,
-      item: form.item,
-      quantity: form.quantity,
-      unit_price: form.unit_price,
-    }
-
-    if (editId) {
-      await supabase.from('sinchai_inventory').update(payload).eq('id', editId)
-      setEditId(null)
-    } else {
-      await supabase.from('sinchai_inventory').insert(payload)
-    }
-    setForm({ ...emptyForm })
-    fetchEntries()
+    const payload = { date: form.date, type: form.type, item: form.item, quantity: form.quantity, unit_price: form.unit_price }
+    if (editId) { await supabase.from('sinchai_inventory').update(payload).eq('id', editId); setEditId(null) }
+    else { await supabase.from('sinchai_inventory').insert(payload) }
+    setForm({ ...emptyForm }); setFormOpen(false); fetchAll()
   }
+  const handleEdit = (entry: InventoryEntry) => { setForm(entry); setEditId(entry.id!); setFormOpen(true) }
+  const handleDelete = async (id: number) => { if (!confirm('ลบรายการนี้?')) return; await supabase.from('sinchai_inventory').delete().eq('id', id); fetchAll() }
 
-  const handleEdit = (entry: InventoryEntry) => {
-    setForm(entry)
-    setEditId(entry.id!)
-  }
-
-  const handleDelete = async (id: number) => {
-    if (!confirm('ลบรายการนี้?')) return
-    await supabase.from('sinchai_inventory').delete().eq('id', id)
-    fetchEntries()
-  }
-
-  // Calculate stock balance per item
   const stockSummary = useMemo(() => {
-    const summary: Record<string, { qty: number; value: number; lastPrice: number }> = {}
-    // Process in chronological order for balance
-    const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
-    for (const e of sorted) {
-      if (!summary[e.item]) summary[e.item] = { qty: 0, value: 0, lastPrice: 0 }
-      const s = summary[e.item]
-      if (e.type === 'in') {
-        s.qty += Number(e.quantity)
-        s.value += Number(e.quantity) * Number(e.unit_price)
-      } else {
-        s.qty -= Number(e.quantity)
-        s.value -= Number(e.quantity) * Number(e.unit_price)
-      }
-      s.lastPrice = Number(e.unit_price)
+    const s: Record<string, { qty: number; value: number }> = {}
+    for (const e of [...entries].sort((a, b) => a.date.localeCompare(b.date))) {
+      if (!s[e.item]) s[e.item] = { qty: 0, value: 0 }
+      const v = Number(e.quantity) * Number(e.unit_price)
+      if (e.type === 'in') { s[e.item].qty += Number(e.quantity); s[e.item].value += v }
+      else { s[e.item].qty -= Number(e.quantity); s[e.item].value -= v }
     }
-    return summary
+    return s
   }, [entries])
 
   const totalStockValue = Object.values(stockSummary).reduce((s, v) => s + Math.max(0, v.value), 0)
-
-  const currentStockValue = openingBalance + totalStockValue
+  const currentStock = openingBalance + totalStockValue
+  const fmt = (n: number) => n.toLocaleString('th-TH')
 
   return (
     <div className="space-y-6">
-      <OpeningBalance module="inventory" label="มูลค่าสต๊อกยกมา" onBalanceChange={(amt) => setOpeningBalance(amt)} />
+      <div><h1 className="text-2xl font-bold text-white">สต๊อกสินค้า</h1><p className="text-xs text-slate-400 mt-1">จัดการสินค้าคงคลังและติดตามการเคลื่อนไหว</p></div>
 
-      {/* Stock Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-sm text-amber-600 font-medium">ยอดยกมา</p>
-          <p className="text-2xl font-bold text-amber-700">{openingBalance.toLocaleString('th-TH')} ฿</p>
-        </div>
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4">
-          <p className="text-sm text-indigo-600 font-medium">มูลค่าสต๊อกปัจจุบัน</p>
-          <p className="text-2xl font-bold text-indigo-700">{currentStockValue.toLocaleString('th-TH')} ฿</p>
-        </div>
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-          <p className="text-sm text-gray-600 font-medium">จำนวนรายการสินค้า</p>
-          <p className="text-2xl font-bold text-gray-700">{Object.keys(stockSummary).length} รายการ</p>
-        </div>
+      <BroughtForwardBar date={obDate ? format(new Date(obDate), 'd MMM yyyy', { locale: th }) : '-'} items={[
+        { label: 'มูลค่าสต๊อกยกมา', value: `${fmt(openingBalance)} ฿` },
+        { label: 'จำนวนรายการ', value: `${Object.keys(stockSummary).length} รายการ` },
+      ]} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <KPICard label="มูลค่าสต๊อกปัจจุบัน" value={`${fmt(currentStock)} ฿`} variant="stock" />
+        <KPICard label="จำนวนรายการสินค้า" value={`${Object.keys(stockSummary).length} รายการ`} variant="balance" />
       </div>
 
-      {/* Current Stock Balance */}
+      {/* Stock Summary Cards */}
       {Object.keys(stockSummary).length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border p-6">
-          <h2 className="text-lg font-semibold mb-4">ยอดคงเหลือสต๊อก</h2>
+        <div className="bg-slate-800 border border-slate-700 rounded-xl p-5">
+          <h2 className="text-base font-semibold text-white mb-4">ยอดคงเหลือสต๊อก</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {Object.entries(stockSummary).map(([item, data]) => (
-              <div key={item} className={`border rounded-lg p-3 ${data.qty <= 0 ? 'bg-red-50 border-red-200' : 'bg-white'}`}>
-                <p className="font-medium text-gray-800">{item}</p>
-                <div className="flex justify-between mt-1 text-sm">
-                  <span className={data.qty <= 0 ? 'text-red-600 font-medium' : 'text-gray-600'}>
-                    คงเหลือ: {data.qty.toLocaleString('th-TH')}
-                  </span>
-                  <span className="text-gray-500">
-                    มูลค่า: {Math.max(0, data.value).toLocaleString('th-TH')} ฿
-                  </span>
+              <div key={item} className={`border rounded-lg p-3 ${data.qty <= 0 ? 'bg-rose-500/10 border-rose-500/30' : 'bg-slate-700/30 border-slate-700'}`}>
+                <p className="font-medium text-white text-sm">{item}</p>
+                <div className="flex justify-between mt-1 text-xs">
+                  <span className={data.qty <= 0 ? 'text-rose-400 font-medium' : 'text-slate-400'}>คงเหลือ: {fmt(data.qty)}</span>
+                  <span className="text-slate-500">มูลค่า: {fmt(Math.max(0, data.value))} ฿</span>
                 </div>
               </div>
             ))}
@@ -129,91 +88,35 @@ export default function InventoryPage() {
         </div>
       )}
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border p-6">
-        <h2 className="text-lg font-semibold mb-4">{editId ? 'แก้ไขรายการ' : 'เพิ่มรายการสต๊อก'}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">วันที่</label>
-            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ประเภท</label>
-            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as 'in' | 'out' })}
-              className="w-full border rounded-lg px-3 py-2">
-              <option value="in">สั่งเข้า</option>
-              <option value="out">ขายออก</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ชื่อสินค้า</label>
-            <input type="text" value={form.item} onChange={e => setForm({ ...form, item: e.target.value })}
-              placeholder="ชื่อสินค้า" className="w-full border rounded-lg px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">จำนวน</label>
-            <input type="number" min="0.01" step="0.01" value={form.quantity || ''} placeholder="0"
-              onChange={e => setForm({ ...form, quantity: parseFloat(e.target.value) || 0 })}
-              className="w-full border rounded-lg px-3 py-2" required />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ราคาต่อหน่วย (฿)</label>
-            <input type="number" min="0" step="0.01" value={form.unit_price || ''} placeholder="0.00"
-              onChange={e => setForm({ ...form, unit_price: parseFloat(e.target.value) || 0 })}
-              className="w-full border rounded-lg px-3 py-2" required />
-          </div>
-        </div>
-        <div className="mt-4 flex gap-2">
-          <button type="submit" className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
-            {editId ? 'บันทึกการแก้ไข' : 'เพิ่มรายการ'}
-          </button>
-          {editId && (
-            <button type="button" onClick={() => { setEditId(null); setForm({ ...emptyForm }) }}
-              className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300">ยกเลิก</button>
-          )}
-        </div>
-      </form>
+      <button onClick={() => { setEditId(null); setForm({ ...emptyForm }); setFormOpen(true) }}
+        className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-600 text-white text-sm font-semibold transition-all hover:shadow-lg hover:shadow-sky-500/30">
+        + เพิ่มรายการ
+      </button>
 
-      {/* Transaction Table */}
-      <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">วันที่</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">ประเภท</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">สินค้า</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">จำนวน</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">ราคา/หน่วย</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">มูลค่า</th>
-                <th className="px-4 py-3 text-center font-medium text-gray-600">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {loading ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">กำลังโหลด...</td></tr>
-              ) : entries.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">ยังไม่มีรายการ</td></tr>
-              ) : entries.map(entry => (
-                <tr key={entry.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">{entry.date}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      entry.type === 'in' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
-                    }`}>
-                      {entry.type === 'in' ? 'สั่งเข้า' : 'ขายออก'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-medium">{entry.item}</td>
-                  <td className="px-4 py-3 text-right">{Number(entry.quantity).toLocaleString('th-TH')}</td>
-                  <td className="px-4 py-3 text-right">{Number(entry.unit_price).toLocaleString('th-TH')}</td>
-                  <td className="px-4 py-3 text-right font-medium">
-                    {(Number(entry.quantity) * Number(entry.unit_price)).toLocaleString('th-TH')}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button onClick={() => handleEdit(entry)} className="text-indigo-600 hover:text-indigo-800 mr-2">แก้ไข</button>
-                    <button onClick={() => handleDelete(entry.id!)} className="text-red-500 hover:text-red-700">ลบ</button>
+            <thead><tr className="bg-slate-700/50">
+              {['วันที่', 'ประเภท', 'สินค้า', 'จำนวน', 'ราคา/หน่วย', 'มูลค่า', 'จัดการ'].map((h, i) => (
+                <th key={h} className={`px-4 py-2.5 text-[0.7rem] font-semibold text-slate-400 uppercase tracking-wider border-b border-slate-700 whitespace-nowrap ${[3,4,5].includes(i) ? 'text-right' : 'text-left'}`}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {loading ? <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">กำลังโหลด...</td></tr>
+              : entries.length === 0 ? <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-500">ยังไม่มีรายการ</td></tr>
+              : entries.map((e, i) => (
+                <tr key={e.id} className={`border-b border-slate-700/30 hover:bg-sky-500/5 ${i % 2 === 1 ? 'bg-slate-800/30' : ''}`}>
+                  <td className="px-4 py-2.5 text-slate-300">{e.date}</td>
+                  <td className="px-4 py-2.5"><StatusBadge variant={e.type === 'in' ? 'success' : 'danger'}>{e.type === 'in' ? 'สั่งเข้า' : 'ขายออก'}</StatusBadge></td>
+                  <td className="px-4 py-2.5 text-white font-medium">{e.item}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-slate-300">{fmt(Number(e.quantity))}</td>
+                  <td className="px-4 py-2.5 text-right font-mono text-slate-300">{fmt(Number(e.unit_price))}</td>
+                  <td className="px-4 py-2.5 text-right font-mono font-medium text-white">{fmt(Number(e.quantity) * Number(e.unit_price))}</td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex gap-1">
+                      <button onClick={() => handleEdit(e)} className="w-7 h-7 rounded-md border border-slate-700 flex items-center justify-center text-slate-400 hover:bg-slate-700 hover:text-white text-xs">✏️</button>
+                      <button onClick={() => handleDelete(e.id!)} className="w-7 h-7 rounded-md border border-slate-700 flex items-center justify-center text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 text-xs">🗑️</button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -221,6 +124,22 @@ export default function InventoryPage() {
           </table>
         </div>
       </div>
+
+      <SlideOutForm open={formOpen} onClose={() => { setFormOpen(false); setEditId(null) }} title={editId ? 'แก้ไขรายการ' : 'เพิ่มรายการสต๊อก'} onSubmit={handleSubmit}>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="วันที่"><input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className={inputClass} required /></FormField>
+          <FormField label="ประเภท">
+            <select value={form.type} onChange={e => setForm({ ...form, type: e.target.value as 'in' | 'out' })} className={selectClass}>
+              <option value="in">สั่งเข้า</option><option value="out">ขายออก</option>
+            </select>
+          </FormField>
+        </div>
+        <FormField label="ชื่อสินค้า"><input type="text" value={form.item} onChange={e => setForm({ ...form, item: e.target.value })} placeholder="ชื่อสินค้า" className={inputClass} required /></FormField>
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="จำนวน"><input type="number" min="0.01" step="0.01" value={form.quantity || ''} placeholder="0" onChange={e => setForm({ ...form, quantity: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
+          <FormField label="ราคาต่อหน่วย (฿)"><input type="number" min="0" step="0.01" value={form.unit_price || ''} placeholder="0.00" onChange={e => setForm({ ...form, unit_price: parseFloat(e.target.value) || 0 })} className={`${inputClass} font-mono`} required /></FormField>
+        </div>
+      </SlideOutForm>
     </div>
   )
 }
