@@ -11,6 +11,7 @@ import TimeRangeSelector from './TimeRangeSelector'
 import type { TimeRange } from './TimeRangeSelector'
 import StatusBadge from './shared/StatusBadge'
 import { useCompany } from '../lib/company'
+import CalendarView from './CalendarView'
 
 interface OpeningBalances { cash_flow: number; loans: number; receivables: number; inventory: number }
 
@@ -25,6 +26,7 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
   const [ob, setOb] = useState<OpeningBalances>({ cash_flow: 0, loans: 0, receivables: 0, inventory: 0 })
   const [loading, setLoading] = useState(true)
   const [timeRange, setTimeRange] = useState<TimeRange>({ label: '6 เดือน', months: 6 })
+  const [view, setView] = useState<'projection' | 'calendar'>('projection')
 
   useEffect(() => {
     let qCf = supabase.from('sinchai_cash_flow').select('*').order('date')
@@ -147,8 +149,20 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
           <h1 className="text-2xl font-bold text-white">แดชบอร์ดวางแผนการเงิน — {selectedName}</h1>
           <p className="text-xs text-slate-400 mt-1">ภาพรวมและประมาณการทุกหมวด — อัปเดตล่าสุด {format(now, 'd MMM yyyy', { locale: th })}</p>
         </div>
-        <TimeRangeSelector onChange={setTimeRange} />
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-0.5">
+            <button onClick={() => setView('projection')} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${view === 'projection' ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30' : 'text-slate-400 hover:text-slate-200'}`}>ประมาณการ</button>
+            <button onClick={() => setView('calendar')} className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${view === 'calendar' ? 'bg-sky-500 text-white shadow-md shadow-sky-500/30' : 'text-slate-400 hover:text-slate-200'}`}>ปฏิทิน</button>
+          </div>
+          {view === 'projection' && <TimeRangeSelector onChange={setTimeRange} />}
+        </div>
       </div>
+
+      {/* Calendar View */}
+      {view === 'calendar' && <CalendarView />}
+
+      {/* Projection View */}
+      {view === 'projection' && <>
 
       {/* Brought Forward */}
       <BroughtForwardBar
@@ -349,6 +363,7 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
           </div>
         </div>
       </div>
+      </>}
     </div>
   )
 }
