@@ -161,10 +161,18 @@ export default function Dashboard({ exportTrigger }: { exportTrigger: number }) 
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard label="เงินสดคงเหลือ" value={fmt(currentCash)} variant="income" valueColor={currentCash >= 0 ? undefined : 'text-rose-400'} />
-        <KPICard label="หนี้คงค้าง" value={fmt(totalDebt)} variant="expense" trend={`${pendingLoans.length} รายการ`} trendDirection="down" />
-        <KPICard label="ลูกหนี้คงค้าง" value={fmt(totalRecv)} variant="debt" trend={`${pendingRecv.length} ราย`} trendDirection="down" />
-        <KPICard label="มูลค่าสต๊อก" value={fmt(totalStock)} variant="stock" />
+        <KPICard label="เงินสดคงเหลือ" value={fmt(currentCash)} variant="income" valueColor={currentCash >= 0 ? undefined : 'text-rose-400'}
+          trend={ob.cash_flow > 0 ? `${currentCash >= ob.cash_flow ? '+' : ''}${(((currentCash - ob.cash_flow) / ob.cash_flow) * 100).toFixed(1)}% จากยอดยกมา` : undefined}
+          trendDirection={currentCash >= ob.cash_flow ? 'up' : 'down'} />
+        <KPICard label="หนี้คงค้าง" value={fmt(totalDebt)} variant="expense"
+          trend={`${pendingLoans.length} รายการค้างชำระ`}
+          trendDirection={pendingLoans.length > 0 ? 'down' : 'up'} />
+        <KPICard label="ลูกหนี้คงค้าง" value={fmt(totalRecv)} variant="debt"
+          trend={`${pendingRecv.filter(r => r.status === 'overdue').length} รายเลยกำหนด`}
+          trendDirection={pendingRecv.filter(r => r.status === 'overdue').length > 0 ? 'down' : 'up'} />
+        <KPICard label="มูลค่าสต๊อก" value={fmt(totalStock)} variant="stock"
+          trend={ob.inventory > 0 ? `${totalStock >= ob.inventory ? '+' : ''}${(((totalStock - ob.inventory) / ob.inventory) * 100).toFixed(1)}% จากยอดยกมา` : `${Object.keys(stockByItem).length} รายการ`}
+          trendDirection={totalStock >= ob.inventory ? 'up' : 'down'} />
       </div>
 
       {/* Cash Flow Projection Chart */}

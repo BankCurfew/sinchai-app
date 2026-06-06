@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 
 interface Props {
   open: boolean
@@ -10,6 +10,13 @@ interface Props {
 }
 
 export default function SlideOutForm({ open, onClose, title, onSubmit, submitLabel = 'บันทึกรายการ', children }: Props) {
+  useEffect(() => {
+    if (!open) return
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
