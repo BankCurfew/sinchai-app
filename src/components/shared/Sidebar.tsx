@@ -1,4 +1,5 @@
 import type { Tab } from '../../types'
+import { useTheme } from '../../lib/theme'
 
 const navItems: { key: Tab; label: string; icon: string }[] = [
   { key: 'dashboard', label: 'แดชบอร์ด', icon: '📊' },
@@ -12,9 +13,12 @@ interface Props {
   activeTab: Tab
   onTabChange: (tab: Tab) => void
   onExport?: () => void
+  onLogout?: () => void
 }
 
-export default function Sidebar({ activeTab, onTabChange, onExport }: Props) {
+export default function Sidebar({ activeTab, onTabChange, onExport, onLogout }: Props) {
+  const { theme, toggle } = useTheme()
+
   return (
     <>
       {/* Desktop Sidebar */}
@@ -42,10 +46,25 @@ export default function Sidebar({ activeTab, onTabChange, onExport }: Props) {
 
           <div className="h-px bg-slate-700/50 mx-3.5 my-2" />
 
-          <button className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-700/50 hover:text-slate-200 transition-all">
-            <span className="text-lg w-6 text-center">⚙️</span>
-            <span>ตั้งค่า</span>
+          {/* Theme Toggle */}
+          <button
+            onClick={toggle}
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-700/50 hover:text-slate-200 transition-all"
+          >
+            <span className="text-lg w-6 text-center">{theme === 'dark' ? '☀️' : '🌙'}</span>
+            <span>{theme === 'dark' ? 'โหมดสว่าง' : 'โหมดมืด'}</span>
           </button>
+
+          {/* Logout */}
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all"
+            >
+              <span className="text-lg w-6 text-center">🚪</span>
+              <span>ออกจากระบบ</span>
+            </button>
+          )}
         </div>
 
         {onExport && (
@@ -61,19 +80,28 @@ export default function Sidebar({ activeTab, onTabChange, onExport }: Props) {
       </nav>
 
       {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700 z-50 flex">
-        {navItems.map((item) => (
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700 z-50 safe-bottom">
+        <div className="flex">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => onTabChange(item.key)}
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs transition-colors min-w-0 ${
+                activeTab === item.key ? 'text-sky-400' : 'text-slate-500'
+              }`}
+            >
+              <span className="text-base">{item.icon}</span>
+              <span className="text-[0.55rem] truncate w-full text-center">{item.label}</span>
+            </button>
+          ))}
           <button
-            key={item.key}
-            onClick={() => onTabChange(item.key)}
-            className={`flex-1 flex flex-col items-center gap-1 py-2 text-xs transition-colors ${
-              activeTab === item.key ? 'text-sky-400' : 'text-slate-500'
-            }`}
+            onClick={toggle}
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-xs text-slate-500 min-w-0"
           >
-            <span className="text-lg">{item.icon}</span>
-            <span className="text-[0.6rem]">{item.label}</span>
+            <span className="text-base">{theme === 'dark' ? '☀️' : '🌙'}</span>
+            <span className="text-[0.55rem]">โหมด</span>
           </button>
-        ))}
+        </div>
       </nav>
     </>
   )

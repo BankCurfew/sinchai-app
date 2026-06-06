@@ -5,6 +5,17 @@ export interface CashFlow {
   amount: number
   description: string
   category: string
+  bank_account_id?: number | null
+  created_at?: string
+}
+
+export interface BankAccount {
+  id?: number
+  name: string
+  account_number: string
+  bank: string
+  account_type: 'savings' | 'current' | 'fixed'
+  balance: number
   created_at?: string
 }
 

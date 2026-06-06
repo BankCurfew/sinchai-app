@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { CashFlow } from '../types'
+import type { CashFlow, BankAccount } from '../types'
 import { format } from 'date-fns'
 import { th } from 'date-fns/locale'
 import KPICard from './shared/KPICard'
@@ -9,7 +9,7 @@ import StatusBadge from './shared/StatusBadge'
 import SlideOutForm from './shared/SlideOutForm'
 import FormField, { inputClass, selectClass } from './shared/FormField'
 
-const emptyForm: CashFlow = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', amount: 0, description: '', category: '' }
+const emptyForm: CashFlow = { date: format(new Date(), 'yyyy-MM-dd'), type: 'in', amount: 0, description: '', category: '', bank_account_id: null }
 
 export default function CashFlowPage() {
   const [entries, setEntries] = useState<CashFlow[]>([])
@@ -22,18 +22,21 @@ export default function CashFlowPage() {
   const [categories, setCategories] = useState<{ in: string[]; out: string[] }>({ in: [], out: [] })
   const [newCategory, setNewCategory] = useState('')
   const [showAddCat, setShowAddCat] = useState(false)
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([])
 
   const fetchAll = async () => {
-    const [{ data: entries }, { data: cats }, { data: ob }] = await Promise.all([
+    const [{ data: entries }, { data: cats }, { data: ob }, { data: accounts }] = await Promise.all([
       supabase.from('sinchai_cash_flow').select('*').order('date', { ascending: false }).order('created_at', { ascending: false }).limit(100),
       supabase.from('sinchai_categories').select('*').order('name'),
       supabase.from('sinchai_opening_balances').select('*').eq('module', 'cash_flow').single(),
+      supabase.from('sinchai_bank_accounts').select('*').order('name'),
     ])
     setEntries(entries || [])
     const c: { in: string[]; out: string[] } = { in: [], out: [] }
     for (const cat of (cats || [])) c[cat.type as 'in' | 'out'].push(cat.name)
     setCategories(c)
     if (ob) { setOpeningBalance(Number(ob.amount)); setObDate(ob.as_of_date) }
+    setBankAccounts(accounts || [])
     setLoading(false)
   }
 
@@ -41,7 +44,7 @@ export default function CashFlowPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { date: form.date, type: form.type, amount: form.amount, description: form.description, category: form.category }
+    const payload = { date: form.date, type: form.type, amount: form.amount, description: form.description, category: form.category, bank_account_id: form.bank_account_id || null }
     if (editId) { await supabase.from('sinchai_cash_flow').update(payload).eq('id', editId); setEditId(null) }
     else { await supabase.from('sinchai_cash_flow').insert(payload) }
     setForm({ ...emptyForm }); setFormOpen(false); fetchAll()
@@ -165,6 +168,14 @@ export default function CashFlowPage() {
             </div>
           )}
         </FormField>
+        {bankAccounts.length > 0 && (
+          <FormField label="บัญชีธนาคาร">
+            <select value={form.bank_account_id ?? ''} onChange={e => setForm({ ...form, bank_account_id: e.target.value ? Number(e.target.value) : null })} className={selectClass}>
+              <option value="">— ไม่ระบุบัญชี —</option>
+              {bankAccounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.bank})</option>)}
+            </select>
+          </FormField>
+        )}
         <FormField label="รายละเอียด">
           <input type="text" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="อธิบายรายการ..." className={inputClass} />
         </FormField>

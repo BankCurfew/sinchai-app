@@ -16,9 +16,48 @@
   --font-mono: 'IBM Plex Mono', 'JetBrains Mono', monospace;
 }
 
-body {
+/* Dark mode (default) */
+:root.dark body, body {
   font-family: var(--font-sans);
   background: #0f172a;
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Light mode overrides */
+:root.light body {
+  background: #f8fafc;
+  color: #1e293b;
+}
+
+:root.light .bg-slate-950 { background-color: #ffffff !important; }
+:root.light .bg-slate-900 { background-color: #f8fafc !important; }
+:root.light .bg-slate-800 { background-color: #ffffff !important; }
+:root.light .bg-slate-700\/50 { background-color: #f1f5f9 !important; }
+:root.light .bg-slate-800\/30 { background-color: #f8fafc !important; }
+
+:root.light .border-slate-700 { border-color: #e2e8f0 !important; }
+:root.light .border-slate-700\/50 { border-color: #e2e8f0 !important; }
+:root.light .border-slate-700\/30 { border-color: #f1f5f9 !important; }
+
+:root.light .text-white { color: #0f172a !important; }
+:root.light .text-slate-200 { color: #334155 !important; }
+:root.light .text-slate-300 { color: #475569 !important; }
+:root.light .text-slate-400 { color: #64748b !important; }
+:root.light .text-slate-500 { color: #94a3b8 !important; }
+
+:root.light .hover\:bg-sky-500\/5:hover { background-color: rgba(14,165,233,0.05) !important; }
+:root.light .hover\:bg-slate-700\/50:hover { background-color: #f1f5f9 !important; }
+:root.light .hover\:bg-slate-700:hover { background-color: #e2e8f0 !important; }
+:root.light .hover\:text-slate-200:hover { color: #0f172a !important; }
+
+/* Light mode form inputs */
+:root.light .bg-slate-700 { background-color: #f1f5f9 !important; }
+:root.light .border-slate-600 { border-color: #cbd5e1 !important; }
+
+/* Light mode sidebar */
+:root.light .border-r { border-right-color: #e2e8f0; }
+
+/* Light mode shadow adjustments */
+:root.light .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04) !important; }
+:root.light .hover\:shadow-lg:hover { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08) !important; }
