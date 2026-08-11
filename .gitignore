@@ -1,1 +1,7 @@
 node_modules/\ndist/\n.env*
+*.key.json
+*token*.json
+*.pem
+*.p12
+*.pfx
+*.jks
